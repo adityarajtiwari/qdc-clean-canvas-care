@@ -93,6 +93,8 @@ export type Database = {
           customer_name: string
           customer_phone: string | null
           date_received: string
+          discount: number | null
+          discount_type: string | null
           due_date: string
           id: string
           items: string
@@ -103,6 +105,7 @@ export type Database = {
           quality_score: number | null
           service_type_id: string | null
           status: string | null
+          subtotal: number | null
           total_weight: number | null
           updated_at: string
         }
@@ -114,6 +117,8 @@ export type Database = {
           customer_name: string
           customer_phone?: string | null
           date_received?: string
+          discount?: number | null
+          discount_type?: string | null
           due_date: string
           id?: string
           items: string
@@ -124,6 +129,7 @@ export type Database = {
           quality_score?: number | null
           service_type_id?: string | null
           status?: string | null
+          subtotal?: number | null
           total_weight?: number | null
           updated_at?: string
         }
@@ -135,6 +141,8 @@ export type Database = {
           customer_name?: string
           customer_phone?: string | null
           date_received?: string
+          discount?: number | null
+          discount_type?: string | null
           due_date?: string
           id?: string
           items?: string
@@ -145,6 +153,7 @@ export type Database = {
           quality_score?: number | null
           service_type_id?: string | null
           status?: string | null
+          subtotal?: number | null
           total_weight?: number | null
           updated_at?: string
         }

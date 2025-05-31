@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -258,6 +259,8 @@ const OrderActions = ({ order }: OrderActionsProps) => {
   const generateInvoicePDF = () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
+    const margin = 20;
+    const rightMargin = pageWidth - margin;
     
     // Header
     doc.setFontSize(20);
@@ -267,19 +270,19 @@ const OrderActions = ({ order }: OrderActionsProps) => {
     // Company details
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
-    doc.text('Laundry Management System', 20, 50);
-    doc.text('123 Business Street', 20, 60);
-    doc.text('City, State 12345', 20, 70);
-    doc.text('Phone: (555) 123-4567', 20, 80);
+    doc.text('Laundry Management System', margin, 50);
+    doc.text('123 Business Street', margin, 60);
+    doc.text('City, State 12345', margin, 70);
+    doc.text('Phone: (555) 123-4567', margin, 80);
     
     // Invoice details
     doc.setFont('helvetica', 'bold');
-    doc.text('Invoice Details:', 20, 100);
+    doc.text('Invoice Details:', margin, 100);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Order Number: ${order.order_number}`, 20, 110);
-    doc.text(`Date: ${new Date(order.date_received).toLocaleDateString()}`, 20, 120);
-    doc.text(`Due Date: ${new Date(order.due_date).toLocaleDateString()}`, 20, 130);
-    doc.text(`Status: ${order.status.toUpperCase()}`, 20, 140);
+    doc.text(`Order Number: ${order.order_number}`, margin, 110);
+    doc.text(`Date: ${new Date(order.date_received).toLocaleDateString()}`, margin, 120);
+    doc.text(`Due Date: ${new Date(order.due_date).toLocaleDateString()}`, margin, 130);
+    doc.text(`Status: ${order.status.toUpperCase()}`, margin, 140);
     
     // Customer details
     doc.setFont('helvetica', 'bold');
@@ -293,61 +296,64 @@ const OrderActions = ({ order }: OrderActionsProps) => {
     
     // Items/Services
     doc.setFont('helvetica', 'bold');
-    doc.text('Items/Services:', 20, 160);
+    doc.text('Items/Services:', margin, 160);
     doc.setFont('helvetica', 'normal');
     
     let yPosition = 170;
     if (order.pricing_type === 'item' && order.items_detail) {
       Object.values(order.items_detail).forEach((item, index) => {
-        doc.text(`${index + 1}. ${item.name} - Qty: ${item.quantity}`, 25, yPosition);
+        doc.text(`${index + 1}. ${item.name} - Qty: ${item.quantity}`, margin + 5, yPosition);
         if (item.price) {
-          doc.text(`₹${item.price.toFixed(2)}`, 150, yPosition);
+          doc.text(`₹${item.price.toFixed(2)}`, 150, yPosition, { align: 'right' });
         }
         yPosition += 10;
       });
     } else {
-      doc.text(order.items, 25, yPosition);
+      doc.text(order.items, margin + 5, yPosition);
       if (order.total_weight) {
         yPosition += 10;
-        doc.text(`Total Weight: ${order.total_weight}kg`, 25, yPosition);
+        doc.text(`Total Weight: ${order.total_weight}kg`, margin + 5, yPosition);
       }
       yPosition += 10;
     }
     
     // Pricing breakdown
     yPosition += 20;
-    const subtotal = (order as any).subtotal || order.amount;
-    const discount = (order as any).discount || 0;
-    const discountType = (order as any).discount_type || 'percentage';
+    const subtotal = order.subtotal || order.amount;
+    const discount = order.discount || 0;
+    const discountType = order.discount_type || 'percentage';
     
-    doc.line(20, yPosition, pageWidth - 20, yPosition);
+    doc.line(margin, yPosition, rightMargin, yPosition);
     yPosition += 15;
     
     // Subtotal
     doc.setFont('helvetica', 'normal');
-    doc.text(`Subtotal: ₹${subtotal.toFixed(2)}`, pageWidth - 20, yPosition, { align: 'right' });
+    doc.text('Subtotal:', rightMargin - 60, yPosition);
+    doc.text(`₹${subtotal.toFixed(2)}`, rightMargin, yPosition, { align: 'right' });
     
     // Discount (if any)
     if (discount > 0) {
       yPosition += 10;
       const discountAmount = discountType === 'percentage' ? (subtotal * discount / 100) : discount;
-      doc.text(`Discount (${discountType === 'percentage' ? `${discount}%` : `₹${discount}`}): -₹${discountAmount.toFixed(2)}`, pageWidth - 20, yPosition, { align: 'right' });
+      doc.text(`Discount (${discountType === 'percentage' ? `${discount}%` : `₹${discount}`}):`, rightMargin - 60, yPosition);
+      doc.text(`-₹${discountAmount.toFixed(2)}`, rightMargin, yPosition, { align: 'right' });
     }
     
     yPosition += 15;
-    doc.line(20, yPosition, pageWidth - 20, yPosition);
+    doc.line(margin, yPosition, rightMargin, yPosition);
     yPosition += 15;
     
     // Final total
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
-    doc.text(`Total Amount: ₹${order.amount.toFixed(2)}`, pageWidth - 20, yPosition, { align: 'right' });
+    doc.text('Total Amount:', rightMargin - 60, yPosition);
+    doc.text(`₹${order.amount.toFixed(2)}`, rightMargin, yPosition, { align: 'right' });
     
     // Quality Score
     if (order.quality_score > 0) {
       yPosition += 20;
       doc.setFontSize(12);
-      doc.text(`Quality Score: ${order.quality_score}%`, 20, yPosition);
+      doc.text(`Quality Score: ${order.quality_score}%`, margin, yPosition);
     }
     
     // Footer
