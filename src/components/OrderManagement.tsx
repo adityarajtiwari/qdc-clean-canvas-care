@@ -25,7 +25,8 @@ const OrderManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
   
-  const { data, isLoading } = useOrders(currentPage, 10, searchTerm, statusFilter);
+  const itemsPerPage = 5; // Fixed to show only 5 orders per page
+  const { data, isLoading } = useOrders(currentPage, itemsPerPage, searchTerm, statusFilter);
   const createOrder = useCreateOrder();
   const createCustomer = useCreateCustomer();
   const { toast } = useToast();
@@ -364,85 +365,83 @@ const OrderManagement = () => {
           <CardTitle>Orders ({totalCount})</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <ScrollArea className="h-[600px] w-full">
-            <div className="p-6">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Order ID</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Items/Service</TableHead>
-                    <TableHead>Pricing</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Due Date</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Quality</TableHead>
-                    <TableHead>Actions</TableHead>
+          <div className="p-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Order ID</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Items/Service</TableHead>
+                  <TableHead>Pricing</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Priority</TableHead>
+                  <TableHead>Due Date</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Quality</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {orders.map((order) => (
+                  <TableRow key={order.id}>
+                    <TableCell className="font-medium">{order.order_number}</TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{order.customer_name}</p>
+                        {order.customer_phone && (
+                          <p className="text-sm text-gray-600">{order.customer_phone}</p>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="text-sm">{order.items}</p>
+                        {order.pricing_type === 'kg' && order.total_weight && (
+                          <p className="text-xs text-gray-500">{order.total_weight}kg</p>
+                        )}
+                        {order.pricing_type === 'item' && order.items_detail && Object.keys(order.items_detail).length > 0 && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {Object.values(order.items_detail).reduce((sum, item) => sum + item.quantity, 0)} items
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {order.pricing_type === 'kg' ? 'By Weight' : 'By Items'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(order.status)}>
+                        {order.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getPriorityColor(order.priority)}>
+                        {order.priority}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-4 w-4 text-gray-400" />
+                        {new Date(order.due_date).toLocaleDateString()}
+                      </div>
+                    </TableCell>
+                    <TableCell>₹{order.amount.toFixed(2)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${order.quality_score >= 95 ? 'bg-green-500' : order.quality_score >= 90 ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
+                        {order.quality_score}%
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <OrderActions order={order} />
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {orders.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-medium">{order.order_number}</TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{order.customer_name}</p>
-                          {order.customer_phone && (
-                            <p className="text-sm text-gray-600">{order.customer_phone}</p>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="text-sm">{order.items}</p>
-                          {order.pricing_type === 'kg' && order.total_weight && (
-                            <p className="text-xs text-gray-500">{order.total_weight}kg</p>
-                          )}
-                          {order.pricing_type === 'item' && order.items_detail && Object.keys(order.items_detail).length > 0 && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              {Object.values(order.items_detail).reduce((sum, item) => sum + item.quantity, 0)} items
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {order.pricing_type === 'kg' ? 'By Weight' : 'By Items'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(order.status)}>
-                          {order.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getPriorityColor(order.priority)}>
-                          {order.priority}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4 text-gray-400" />
-                          {new Date(order.due_date).toLocaleDateString()}
-                        </div>
-                      </TableCell>
-                      <TableCell>₹{order.amount.toFixed(2)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${order.quality_score >= 95 ? 'bg-green-500' : order.quality_score >= 90 ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
-                          {order.quality_score}%
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <OrderActions order={order} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </ScrollArea>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
           
           <div className="p-6 border-t">
             <Pagination

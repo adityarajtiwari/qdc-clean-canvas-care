@@ -309,13 +309,13 @@ const CustomerManagement = () => {
         </CardContent>
       </Card>
 
-      {/* Customer Table */}
+      {/* Customer Table with Scrolling */}
       <Card>
         <CardHeader>
           <CardTitle>Customers ({filteredCustomers.length})</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <ScrollArea className="h-[600px] w-full">
+          <ScrollArea className="h-[500px] w-full">
             <div className="p-6">
               <Table>
                 <TableHeader>
