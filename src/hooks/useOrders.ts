@@ -58,6 +58,7 @@ export const useOrders = (page: number = 1, limit: number = 10, searchTerm?: str
       const transformedData: Order[] = (data || []).map(order => ({
         ...order,
         status: order.status as Order['status'],
+        priority: order.priority as Order['priority'],
         items_detail: (order.items_detail as unknown as Record<string, OrderItem>) || {}
       }));
 
