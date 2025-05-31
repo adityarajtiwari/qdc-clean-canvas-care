@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Eye, Edit, Trash2, Calendar } from 'lucide-react';
+import { Eye, Edit, Trash2, Calendar, FileText, Download } from 'lucide-react';
 import { Order, useUpdateOrderStatus, useDeleteOrder, useUpdateOrder, OrderItem } from '@/hooks/useOrders';
 import { useToast } from '@/hooks/use-toast';
 import CustomerSearch from '@/components/CustomerSearch';
@@ -13,6 +13,7 @@ import PricingSelector from '@/components/PricingSelector';
 import ItemPricingInput from '@/components/ItemPricingInput';
 import KgPricingInput from '@/components/KgPricingInput';
 import { useCreateCustomer } from '@/hooks/useCustomers';
+import jsPDF from 'jspdf';
 
 interface OrderActionsProps {
   order: Order;
@@ -221,6 +222,95 @@ const OrderActions = ({ order }: OrderActionsProps) => {
     }
   };
 
+  const generateInvoicePDF = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    
+    // Header
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INVOICE', pageWidth / 2, 30, { align: 'center' });
+    
+    // Company details (you can customize this)
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Laundry Management System', 20, 50);
+    doc.text('123 Business Street', 20, 60);
+    doc.text('City, State 12345', 20, 70);
+    doc.text('Phone: (555) 123-4567', 20, 80);
+    
+    // Invoice details
+    doc.setFont('helvetica', 'bold');
+    doc.text('Invoice Details:', 20, 100);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Order Number: ${order.order_number}`, 20, 110);
+    doc.text(`Date: ${new Date(order.date_received).toLocaleDateString()}`, 20, 120);
+    doc.text(`Due Date: ${new Date(order.due_date).toLocaleDateString()}`, 20, 130);
+    doc.text(`Status: ${order.status.toUpperCase()}`, 20, 140);
+    
+    // Customer details
+    doc.setFont('helvetica', 'bold');
+    doc.text('Customer Details:', 120, 100);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Name: ${order.customer_name}`, 120, 110);
+    if (order.customer_phone) {
+      doc.text(`Phone: ${order.customer_phone}`, 120, 120);
+    }
+    doc.text(`Priority: ${order.priority.toUpperCase()}`, 120, 130);
+    
+    // Items/Services
+    doc.setFont('helvetica', 'bold');
+    doc.text('Items/Services:', 20, 160);
+    doc.setFont('helvetica', 'normal');
+    
+    let yPosition = 170;
+    if (order.pricing_type === 'item' && order.items_detail) {
+      Object.values(order.items_detail).forEach((item, index) => {
+        doc.text(`${index + 1}. ${item.name} - Qty: ${item.quantity}`, 25, yPosition);
+        if (item.price) {
+          doc.text(`₹${item.price.toFixed(2)}`, 150, yPosition);
+        }
+        yPosition += 10;
+      });
+    } else {
+      doc.text(order.items, 25, yPosition);
+      if (order.total_weight) {
+        yPosition += 10;
+        doc.text(`Total Weight: ${order.total_weight}kg`, 25, yPosition);
+      }
+      yPosition += 10;
+    }
+    
+    // Total
+    yPosition += 20;
+    doc.line(20, yPosition, pageWidth - 20, yPosition);
+    yPosition += 15;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text(`Total Amount: ₹${order.amount.toFixed(2)}`, pageWidth - 20, yPosition, { align: 'right' });
+    
+    // Quality Score
+    if (order.quality_score > 0) {
+      yPosition += 20;
+      doc.setFontSize(12);
+      doc.text(`Quality Score: ${order.quality_score}%`, 20, yPosition);
+    }
+    
+    // Footer
+    yPosition = doc.internal.pageSize.height - 30;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text('Thank you for your business!', pageWidth / 2, yPosition, { align: 'center' });
+    
+    // Save the PDF
+    doc.save(`invoice-${order.order_number}.pdf`);
+    
+    toast({
+      title: "Success",
+      description: "Invoice downloaded successfully"
+    });
+  };
+
   return (
     <div className="flex gap-2">
       {/* Status Update */}
@@ -403,6 +493,11 @@ const OrderActions = ({ order }: OrderActionsProps) => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Generate Invoice */}
+      <Button variant="ghost" size="sm" onClick={generateInvoicePDF} className="text-blue-600 hover:text-blue-800">
+        <FileText className="h-4 w-4" />
+      </Button>
 
       {/* Delete Order */}
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
