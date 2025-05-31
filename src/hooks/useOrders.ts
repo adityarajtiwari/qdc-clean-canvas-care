@@ -66,6 +66,7 @@ export const useOrders = (page: number = 1, limit: number = 10, searchTerm?: str
         status: order.status as Order['status'],
         priority: order.priority as Order['priority'],
         pricing_type: (order.pricing_type as Order['pricing_type']) || 'item',
+        discount_type: (order.discount_type as Order['discount_type']) || 'percentage',
         items_detail: (order.items_detail as unknown as Record<string, OrderItem>) || {}
       }));
 
