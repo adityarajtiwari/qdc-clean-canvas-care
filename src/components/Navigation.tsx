@@ -10,8 +10,11 @@ import {
   Warehouse, 
   Settings,
   Bell,
-  User
+  User,
+  LogOut
 } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 interface NavigationProps {
   currentPage: string;
@@ -19,6 +22,9 @@ interface NavigationProps {
 }
 
 const Navigation = ({ currentPage, onPageChange }: NavigationProps) => {
+  const { signOut, user } = useAuth();
+  const { toast } = useToast();
+
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'orders', label: 'Orders', icon: Package, badge: '12' },
@@ -27,6 +33,22 @@ const Navigation = ({ currentPage, onPageChange }: NavigationProps) => {
     { id: 'inventory', label: 'Inventory', icon: Warehouse },
     { id: 'settings', label: 'Settings', icon: Settings }
   ];
+
+  const handleSignOut = async () => {
+    const { error } = await signOut();
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to sign out",
+        variant: "destructive"
+      });
+    } else {
+      toast({
+        title: "Success",
+        description: "Signed out successfully"
+      });
+    }
+  };
 
   return (
     <div className="bg-white shadow-sm border-b">
@@ -76,10 +98,15 @@ const Navigation = ({ currentPage, onPageChange }: NavigationProps) => {
                 5
               </Badge>
             </Button>
-            <Button variant="ghost" size="sm">
-              <User className="h-4 w-4 mr-2" />
-              Admin
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm">
+                <User className="h-4 w-4 mr-2" />
+                {user?.email || 'User'}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleSignOut}>
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,18 +9,26 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Plus, Eye, Edit, Trash2, Calendar } from 'lucide-react';
+import { Search, Plus, Calendar } from 'lucide-react';
 import { useOrders, useCreateOrder, Order } from '@/hooks/useOrders';
 import { useToast } from '@/hooks/use-toast';
+import OrderActions from '@/components/OrderActions';
+import Pagination from '@/components/Pagination';
 
 const OrderManagement = () => {
-  const { data: orders = [], isLoading } = useOrders();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
+  
+  const { data, isLoading } = useOrders(currentPage, 10, searchTerm, statusFilter);
   const createOrder = useCreateOrder();
   const { toast } = useToast();
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
+  const orders = data?.orders || [];
+  const totalPages = data?.totalPages || 1;
+  const totalCount = data?.totalCount || 0;
+
   const [newOrder, setNewOrder] = useState<{
     customer_name: string;
     customer_phone: string;
@@ -56,12 +65,15 @@ const OrderManagement = () => {
     return colors[priority as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
 
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.order_number.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(1); // Reset to first page when searching
+  };
+
+  const handleStatusFilter = (value: string) => {
+    setStatusFilter(value);
+    setCurrentPage(1); // Reset to first page when filtering
+  };
 
   const handleCreateOrder = async () => {
     if (!newOrder.customer_name || !newOrder.items || !newOrder.due_date || newOrder.amount <= 0) {
@@ -223,11 +235,11 @@ const OrderManagement = () => {
               <Input
                 placeholder="Search orders by customer name or order ID..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => handleSearch(e.target.value)}
                 className="pl-10"
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={handleStatusFilter}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
@@ -247,7 +259,7 @@ const OrderManagement = () => {
       {/* Orders Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Orders ({filteredOrders.length})</CardTitle>
+          <CardTitle>Orders ({totalCount})</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -265,7 +277,7 @@ const OrderManagement = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredOrders.map((order) => (
+              {orders.map((order) => (
                 <TableRow key={order.id}>
                   <TableCell className="font-medium">{order.order_number}</TableCell>
                   <TableCell>
@@ -301,22 +313,21 @@ const OrderManagement = () => {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-800">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <OrderActions order={order} />
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+          
+          {/* Pagination */}
+          <div className="mt-6">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
+          </div>
         </CardContent>
       </Card>
     </div>
