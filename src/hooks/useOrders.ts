@@ -42,7 +42,7 @@ export const useCreateOrder = () => {
     mutationFn: async (order: Omit<Order, 'id' | 'order_number' | 'created_at' | 'updated_at'>) => {
       const { data, error } = await supabase
         .from('orders')
-        .insert([order])
+        .insert(order)
         .select()
         .single();
 

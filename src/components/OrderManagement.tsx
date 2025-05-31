@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Search, Plus, Eye, Edit, Trash2, Calendar } from 'lucide-react';
-import { useOrders, useCreateOrder } from '@/hooks/useOrders';
+import { useOrders, useCreateOrder, Order } from '@/hooks/useOrders';
 import { useToast } from '@/hooks/use-toast';
 
 const OrderManagement = () => {
@@ -21,11 +20,18 @@ const OrderManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
-  const [newOrder, setNewOrder] = useState({
+  const [newOrder, setNewOrder] = useState<{
+    customer_name: string;
+    customer_phone: string;
+    items: string;
+    priority: Order['priority'];
+    amount: number;
+    due_date: string;
+  }>({
     customer_name: '',
     customer_phone: '',
     items: '',
-    priority: 'normal' as const,
+    priority: 'normal',
     amount: 0,
     due_date: ''
   });
@@ -163,7 +169,7 @@ const OrderManagement = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="priority">Priority</Label>
-                  <Select value={newOrder.priority} onValueChange={(value: 'low' | 'normal' | 'urgent') => setNewOrder(prev => ({ ...prev, priority: value }))}>
+                  <Select value={newOrder.priority} onValueChange={(value: Order['priority']) => setNewOrder(prev => ({ ...prev, priority: value }))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select priority" />
                     </SelectTrigger>

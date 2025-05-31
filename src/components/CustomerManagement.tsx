@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, Plus, Eye, Edit, Phone, Mail, Star, Users } from 'lucide-react';
-import { useCustomers, useCreateCustomer } from '@/hooks/useCustomers';
+import { useCustomers, useCreateCustomer, Customer } from '@/hooks/useCustomers';
 import { useToast } from '@/hooks/use-toast';
 
 const CustomerManagement = () => {
@@ -21,12 +20,18 @@ const CustomerManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isNewCustomerOpen, setIsNewCustomerOpen] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({
+  const [newCustomer, setNewCustomer] = useState<{
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+    loyalty_tier: Customer['loyalty_tier'];
+  }>({
     name: '',
     email: '',
     phone: '',
     address: '',
-    loyalty_tier: 'bronze' as const
+    loyalty_tier: 'bronze'
   });
 
   const getStatusColor = (status: string) => {
@@ -177,7 +182,7 @@ const CustomerManagement = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="loyaltyTier">Loyalty Tier</Label>
-                <Select value={newCustomer.loyalty_tier} onValueChange={(value: 'bronze' | 'silver' | 'gold' | 'platinum') => setNewCustomer(prev => ({ ...prev, loyalty_tier: value }))}>
+                <Select value={newCustomer.loyalty_tier} onValueChange={(value: Customer['loyalty_tier']) => setNewCustomer(prev => ({ ...prev, loyalty_tier: value }))}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select loyalty tier" />
                   </SelectTrigger>
