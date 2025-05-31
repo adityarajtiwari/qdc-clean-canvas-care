@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Plus, Eye, Edit, Phone, Mail, MapPin, Star } from 'lucide-react';
+import { Search, Plus, Eye, Edit, Phone, Mail, MapPin, Star, Users } from 'lucide-react';
 
 const CustomerManagement = () => {
   const [customers, setCustomers] = useState([
