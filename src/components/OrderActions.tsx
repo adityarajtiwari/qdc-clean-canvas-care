@@ -1,14 +1,18 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Eye, Edit, Trash2, Calendar } from 'lucide-react';
-import { Order, useUpdateOrderStatus, useDeleteOrder, useUpdateOrder } from '@/hooks/useOrders';
+import { Order, useUpdateOrderStatus, useDeleteOrder, useUpdateOrder, OrderItem } from '@/hooks/useOrders';
 import { useToast } from '@/hooks/use-toast';
+import CustomerSearch from '@/components/CustomerSearch';
+import PricingSelector from '@/components/PricingSelector';
+import ItemPricingInput from '@/components/ItemPricingInput';
+import KgPricingInput from '@/components/KgPricingInput';
+import { useCreateCustomer } from '@/hooks/useCustomers';
 
 interface OrderActionsProps {
   order: Order;
@@ -21,15 +25,20 @@ const OrderActions = ({ order }: OrderActionsProps) => {
   const updateStatus = useUpdateOrderStatus();
   const deleteOrder = useDeleteOrder();
   const updateOrder = useUpdateOrder();
+  const createCustomer = useCreateCustomer();
   const { toast } = useToast();
 
   const [editData, setEditData] = useState({
+    customer_id: order.customer_id,
     customer_name: order.customer_name,
     customer_phone: order.customer_phone || '',
     items: order.items,
+    items_detail: order.items_detail || {},
     priority: order.priority,
     amount: order.amount,
     due_date: order.due_date.split('T')[0],
+    pricing_type: order.pricing_type,
+    service_type_id: order.service_type_id,
     total_weight: order.total_weight || 0
   });
 
@@ -86,16 +95,115 @@ const OrderActions = ({ order }: OrderActionsProps) => {
     }
   };
 
+  const handleCustomerSelect = (customerId: string, customerName: string, customerPhone?: string) => {
+    setEditData(prev => ({
+      ...prev,
+      customer_id: customerId,
+      customer_name: customerName,
+      customer_phone: customerPhone || ''
+    }));
+  };
+
+  const handleNewCustomer = async (name: string, phone: string) => {
+    try {
+      const newCustomer = await createCustomer.mutateAsync({
+        name,
+        phone,
+        email: `${name.toLowerCase().replace(/\s+/g, '')}@temp.com`,
+        status: 'active' as const,
+        loyalty_tier: 'bronze' as const,
+        total_orders: 0,
+        total_spent: 0,
+        rating: 0
+      });
+      
+      handleCustomerSelect(newCustomer.id, newCustomer.name, newCustomer.phone || undefined);
+      
+      toast({
+        title: "Success",
+        description: "Customer created successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create customer",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleItemsChange = (items: Record<string, OrderItem>) => {
+    const itemsString = Object.values(items)
+      .map(item => `${item.name} (${item.quantity})`)
+      .join(', ');
+    
+    setEditData(prev => ({
+      ...prev,
+      items: itemsString,
+      items_detail: items
+    }));
+  };
+
+  const handleAmountCalculated = (amount: number) => {
+    setEditData(prev => ({
+      ...prev,
+      amount
+    }));
+  };
+
+  const handlePricingTypeChange = (pricingType: 'item' | 'kg') => {
+    setEditData(prev => ({
+      ...prev,
+      pricing_type: pricingType,
+      items: '',
+      items_detail: {},
+      service_type_id: undefined,
+      total_weight: 0,
+      amount: 0
+    }));
+  };
+
   const handleEditSubmit = async () => {
+    if (!editData.customer_name || !editData.due_date || editData.amount <= 0) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (editData.pricing_type === 'item' && Object.keys(editData.items_detail).length === 0) {
+      toast({
+        title: "Error",
+        description: "Please add at least one item",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (editData.pricing_type === 'kg' && (!editData.service_type_id || !editData.total_weight)) {
+      toast({
+        title: "Error",
+        description: "Please select service type and enter weight",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       await updateOrder.mutateAsync({
         id: order.id,
+        customer_id: editData.customer_id,
         customer_name: editData.customer_name,
         customer_phone: editData.customer_phone,
-        items: editData.items,
+        items: editData.pricing_type === 'kg' ? `Weight-based service: ${editData.total_weight}kg` : editData.items,
+        items_detail: editData.items_detail,
         priority: editData.priority,
         amount: editData.amount,
         due_date: editData.due_date,
+        pricing_type: editData.pricing_type,
+        service_type_id: editData.service_type_id,
         total_weight: editData.total_weight
       });
       
@@ -211,42 +319,47 @@ const OrderActions = ({ order }: OrderActionsProps) => {
             <Edit className="h-4 w-4" />
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Order - {order.order_number}</DialogTitle>
+            <DialogDescription>
+              Update the details for this laundry order.
+            </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4">
+          <div className="grid gap-6 py-4">
+            <CustomerSearch
+              value={editData.customer_id}
+              onSelect={handleCustomerSelect}
+              onNewCustomer={handleNewCustomer}
+            />
+            
+            <PricingSelector
+              value={editData.pricing_type}
+              onChange={handlePricingTypeChange}
+            />
+            
+            {editData.pricing_type === 'item' ? (
+              <ItemPricingInput
+                items={editData.items_detail}
+                onChange={handleItemsChange}
+                onAmountCalculated={handleAmountCalculated}
+              />
+            ) : (
+              <KgPricingInput
+                serviceTypeId={editData.service_type_id || ''}
+                weight={editData.total_weight || 0}
+                onServiceTypeChange={(serviceTypeId) => setEditData(prev => ({ ...prev, service_type_id: serviceTypeId }))}
+                onWeightChange={(weight) => setEditData(prev => ({ ...prev, total_weight: weight }))}
+                onAmountCalculated={handleAmountCalculated}
+              />
+            )}
+            
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Customer Name</Label>
-                <Input
-                  value={editData.customer_name}
-                  onChange={(e) => setEditData(prev => ({ ...prev, customer_name: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Customer Phone</Label>
-                <Input
-                  value={editData.customer_phone}
-                  onChange={(e) => setEditData(prev => ({ ...prev, customer_phone: e.target.value }))}
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Items</Label>
-              <Input
-                value={editData.items}
-                onChange={(e) => setEditData(prev => ({ ...prev, items: e.target.value }))}
-              />
-            </div>
-            
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Priority</Label>
+                <Label htmlFor="priority">Priority</Label>
                 <Select value={editData.priority} onValueChange={(value: Order['priority']) => setEditData(prev => ({ ...prev, priority: value }))}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Select priority" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="low">Low</SelectItem>
@@ -256,35 +369,28 @@ const OrderActions = ({ order }: OrderActionsProps) => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Amount (₹)</Label>
-                <Input
-                  type="number"
+                <Label htmlFor="amount">Amount (₹)</Label>
+                <Input 
+                  id="amount" 
+                  type="number" 
+                  placeholder="0.00" 
                   step="0.01"
-                  value={editData.amount}
-                  onChange={(e) => setEditData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Due Date</Label>
-                <Input
-                  type="date"
-                  value={editData.due_date}
-                  onChange={(e) => setEditData(prev => ({ ...prev, due_date: e.target.value }))}
+                  value={editData.amount || ''}
+                  readOnly
+                  className="bg-gray-50"
                 />
               </div>
             </div>
             
-            {order.pricing_type === 'kg' && (
-              <div className="space-y-2">
-                <Label>Total Weight (KG)</Label>
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={editData.total_weight}
-                  onChange={(e) => setEditData(prev => ({ ...prev, total_weight: parseFloat(e.target.value) || 0 }))}
-                />
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="dueDate">Due Date</Label>
+              <Input 
+                id="dueDate" 
+                type="date"
+                value={editData.due_date}
+                onChange={(e) => setEditData(prev => ({ ...prev, due_date: e.target.value }))}
+              />
+            </div>
           </div>
           
           <div className="flex justify-end gap-2 mt-4">
