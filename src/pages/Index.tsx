@@ -13,7 +13,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
+      <Navigation currentPage={activeTab} onPageChange={setActiveTab} />
       <main className="container mx-auto py-6 px-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">

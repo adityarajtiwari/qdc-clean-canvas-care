@@ -150,7 +150,7 @@ const InventoryManagement = () => {
                             </div>
                             <div className="flex items-center gap-2">
                               <span>{order.quantity} pcs</span>
-                              <Badge className={getStatusColor(order.status)} size="sm">
+                              <Badge className={getStatusColor(order.status)}>
                                 {order.status}
                               </Badge>
                             </div>
@@ -200,7 +200,7 @@ const InventoryManagement = () => {
                             </div>
                             <div className="flex items-center gap-2">
                               <span>{order.weight.toFixed(1)} kg</span>
-                              <Badge className={getStatusColor(order.status)} size="sm">
+                              <Badge className={getStatusColor(order.status)}>
                                 {order.status}
                               </Badge>
                             </div>
