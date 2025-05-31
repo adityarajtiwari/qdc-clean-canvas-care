@@ -2,6 +2,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+export interface OrderItem {
+  name: string;
+  quantity: number;
+  price?: number;
+}
+
 export interface Order {
   id: string;
   order_number: string;
@@ -9,6 +15,7 @@ export interface Order {
   customer_name: string;
   customer_phone?: string;
   items: string;
+  items_detail?: Record<string, OrderItem>;
   status: 'received' | 'processing' | 'ready' | 'completed' | 'delayed';
   priority: 'low' | 'normal' | 'urgent';
   amount: number;

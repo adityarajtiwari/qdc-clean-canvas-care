@@ -69,6 +69,7 @@ export type Database = {
           due_date: string
           id: string
           items: string
+          items_detail: Json | null
           order_number: string
           priority: string | null
           quality_score: number | null
@@ -86,6 +87,7 @@ export type Database = {
           due_date: string
           id?: string
           items: string
+          items_detail?: Json | null
           order_number: string
           priority?: string | null
           quality_score?: number | null
@@ -103,6 +105,7 @@ export type Database = {
           due_date?: string
           id?: string
           items?: string
+          items_detail?: Json | null
           order_number?: string
           priority?: string | null
           quality_score?: number | null

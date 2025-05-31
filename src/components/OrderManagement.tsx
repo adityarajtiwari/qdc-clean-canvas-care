@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,12 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Search, Plus, Calendar } from 'lucide-react';
-import { useOrders, useCreateOrder, Order } from '@/hooks/useOrders';
+import { useOrders, useCreateOrder, Order, OrderItem } from '@/hooks/useOrders';
+import { useCreateCustomer } from '@/hooks/useCustomers';
 import { useToast } from '@/hooks/use-toast';
 import OrderActions from '@/components/OrderActions';
 import Pagination from '@/components/Pagination';
+import CustomerSearch from '@/components/CustomerSearch';
+import ItemQuantityInput from '@/components/ItemQuantityInput';
 
 const OrderManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -23,6 +24,7 @@ const OrderManagement = () => {
   
   const { data, isLoading } = useOrders(currentPage, 10, searchTerm, statusFilter);
   const createOrder = useCreateOrder();
+  const createCustomer = useCreateCustomer();
   const { toast } = useToast();
 
   const orders = data?.orders || [];
@@ -30,9 +32,11 @@ const OrderManagement = () => {
   const totalCount = data?.totalCount || 0;
 
   const [newOrder, setNewOrder] = useState<{
+    customer_id?: string;
     customer_name: string;
     customer_phone: string;
     items: string;
+    items_detail: Record<string, OrderItem>;
     priority: Order['priority'];
     amount: number;
     due_date: string;
@@ -40,6 +44,7 @@ const OrderManagement = () => {
     customer_name: '',
     customer_phone: '',
     items: '',
+    items_detail: {},
     priority: 'normal',
     amount: 0,
     due_date: ''
@@ -75,6 +80,55 @@ const OrderManagement = () => {
     setCurrentPage(1); // Reset to first page when filtering
   };
 
+  const handleCustomerSelect = (customerId: string, customerName: string, customerPhone?: string) => {
+    setNewOrder(prev => ({
+      ...prev,
+      customer_id: customerId,
+      customer_name: customerName,
+      customer_phone: customerPhone || ''
+    }));
+  };
+
+  const handleNewCustomer = async (name: string, phone: string) => {
+    try {
+      const newCustomer = await createCustomer.mutateAsync({
+        name,
+        phone,
+        email: `${name.toLowerCase().replace(/\s+/g, '')}@temp.com`, // Temporary email
+        status: 'active' as const,
+        loyalty_tier: 'bronze' as const,
+        total_orders: 0,
+        total_spent: 0,
+        rating: 0
+      });
+      
+      handleCustomerSelect(newCustomer.id, newCustomer.name, newCustomer.phone || undefined);
+      
+      toast({
+        title: "Success",
+        description: "Customer created successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create customer",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleItemsChange = (items: Record<string, OrderItem>) => {
+    const itemsString = Object.values(items)
+      .map(item => `${item.name} (${item.quantity})`)
+      .join(', ');
+    
+    setNewOrder(prev => ({
+      ...prev,
+      items: itemsString,
+      items_detail: items
+    }));
+  };
+
   const handleCreateOrder = async () => {
     if (!newOrder.customer_name || !newOrder.items || !newOrder.due_date || newOrder.amount <= 0) {
       toast({
@@ -98,6 +152,7 @@ const OrderManagement = () => {
         customer_name: '',
         customer_phone: '',
         items: '',
+        items_detail: {},
         priority: 'normal',
         amount: 0,
         due_date: ''
@@ -141,43 +196,25 @@ const OrderManagement = () => {
               New Order
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New Order</DialogTitle>
               <DialogDescription>
                 Enter the details for the new laundry order.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="customer">Customer Name</Label>
-                  <Input 
-                    id="customer" 
-                    placeholder="Enter customer name"
-                    value={newOrder.customer_name}
-                    onChange={(e) => setNewOrder(prev => ({ ...prev, customer_name: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input 
-                    id="phone" 
-                    placeholder="Enter phone number"
-                    value={newOrder.customer_phone}
-                    onChange={(e) => setNewOrder(prev => ({ ...prev, customer_phone: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="items">Items Description</Label>
-                <Textarea 
-                  id="items" 
-                  placeholder="Describe the items (e.g., Shirts (3), Pants (2))"
-                  value={newOrder.items}
-                  onChange={(e) => setNewOrder(prev => ({ ...prev, items: e.target.value }))}
-                />
-              </div>
+            <div className="grid gap-6 py-4">
+              <CustomerSearch
+                value={newOrder.customer_id}
+                onSelect={handleCustomerSelect}
+                onNewCustomer={handleNewCustomer}
+              />
+              
+              <ItemQuantityInput
+                items={newOrder.items_detail}
+                onChange={handleItemsChange}
+              />
+              
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="priority">Priority</Label>
@@ -288,7 +325,16 @@ const OrderManagement = () => {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>{order.items}</TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="text-sm">{order.items}</p>
+                      {order.items_detail && Object.keys(order.items_detail).length > 0 && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          {Object.values(order.items_detail).reduce((sum, item) => sum + item.quantity, 0)} items
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <Badge className={getStatusColor(order.status)}>
                       {order.status}
