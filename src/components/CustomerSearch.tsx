@@ -17,7 +17,7 @@ interface CustomerSearchProps {
 
 const CustomerSearch = ({ value, onSelect, onNewCustomer }: CustomerSearchProps) => {
   const { data: customersData, isLoading, error } = useCustomers();
-  const customers = customersData || [];
+  const customers = Array.isArray(customersData) ? customersData : [];
   
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
@@ -28,6 +28,7 @@ const CustomerSearch = ({ value, onSelect, onNewCustomer }: CustomerSearchProps)
   const selectedCustomer = customers.find(customer => customer.id === value);
 
   const filteredCustomers = customers.filter(customer => {
+    if (!customer || !customer.name || !customer.email) return false;
     const searchLower = searchValue.toLowerCase();
     return customer.name.toLowerCase().includes(searchLower) ||
            customer.email.toLowerCase().includes(searchLower) ||
