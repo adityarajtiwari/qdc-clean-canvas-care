@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -22,6 +23,9 @@ export interface Order {
   date_received: string;
   due_date: string;
   completed_date?: string;
+  pricing_type: 'item' | 'kg';
+  service_type_id?: string;
+  total_weight?: number;
   created_at: string;
   updated_at: string;
 }
@@ -58,6 +62,7 @@ export const useOrders = (page: number = 1, limit: number = 10, searchTerm?: str
         ...order,
         status: order.status as Order['status'],
         priority: order.priority as Order['priority'],
+        pricing_type: (order.pricing_type as Order['pricing_type']) || 'item',
         items_detail: (order.items_detail as unknown as Record<string, OrderItem>) || {}
       }));
 
@@ -148,7 +153,7 @@ export const useUpdateOrderStatus = () => {
       // Set completed_date when status changes to completed
       if (status === 'completed') {
         updates.completed_date = new Date().toISOString();
-      } else if (status !== 'completed') {
+      } else {
         updates.completed_date = null;
       }
 

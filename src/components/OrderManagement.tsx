@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,9 @@ import { useToast } from '@/hooks/use-toast';
 import OrderActions from '@/components/OrderActions';
 import Pagination from '@/components/Pagination';
 import CustomerSearch from '@/components/CustomerSearch';
-import ItemQuantityInput from '@/components/ItemQuantityInput';
+import PricingSelector from '@/components/PricingSelector';
+import ItemPricingInput from '@/components/ItemPricingInput';
+import KgPricingInput from '@/components/KgPricingInput';
 
 const OrderManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -40,6 +43,9 @@ const OrderManagement = () => {
     priority: Order['priority'];
     amount: number;
     due_date: string;
+    pricing_type: 'item' | 'kg';
+    service_type_id?: string;
+    total_weight?: number;
   }>({
     customer_name: '',
     customer_phone: '',
@@ -47,7 +53,9 @@ const OrderManagement = () => {
     items_detail: {},
     priority: 'normal',
     amount: 0,
-    due_date: ''
+    due_date: '',
+    pricing_type: 'item',
+    total_weight: 0
   });
 
   const getStatusColor = (status: string) => {
@@ -72,12 +80,12 @@ const OrderManagement = () => {
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
-    setCurrentPage(1); // Reset to first page when searching
+    setCurrentPage(1);
   };
 
   const handleStatusFilter = (value: string) => {
     setStatusFilter(value);
-    setCurrentPage(1); // Reset to first page when filtering
+    setCurrentPage(1);
   };
 
   const handleCustomerSelect = (customerId: string, customerName: string, customerPhone?: string) => {
@@ -94,7 +102,7 @@ const OrderManagement = () => {
       const newCustomer = await createCustomer.mutateAsync({
         name,
         phone,
-        email: `${name.toLowerCase().replace(/\s+/g, '')}@temp.com`, // Temporary email
+        email: `${name.toLowerCase().replace(/\s+/g, '')}@temp.com`,
         status: 'active' as const,
         loyalty_tier: 'bronze' as const,
         total_orders: 0,
@@ -129,8 +137,27 @@ const OrderManagement = () => {
     }));
   };
 
+  const handleAmountCalculated = (amount: number) => {
+    setNewOrder(prev => ({
+      ...prev,
+      amount
+    }));
+  };
+
+  const handlePricingTypeChange = (pricingType: 'item' | 'kg') => {
+    setNewOrder(prev => ({
+      ...prev,
+      pricing_type: pricingType,
+      items: '',
+      items_detail: {},
+      service_type_id: undefined,
+      total_weight: 0,
+      amount: 0
+    }));
+  };
+
   const handleCreateOrder = async () => {
-    if (!newOrder.customer_name || !newOrder.items || !newOrder.due_date || newOrder.amount <= 0) {
+    if (!newOrder.customer_name || !newOrder.due_date || newOrder.amount <= 0) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -139,9 +166,28 @@ const OrderManagement = () => {
       return;
     }
 
+    if (newOrder.pricing_type === 'item' && Object.keys(newOrder.items_detail).length === 0) {
+      toast({
+        title: "Error",
+        description: "Please add at least one item",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (newOrder.pricing_type === 'kg' && (!newOrder.service_type_id || !newOrder.total_weight)) {
+      toast({
+        title: "Error",
+        description: "Please select service type and enter weight",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       await createOrder.mutateAsync({
         ...newOrder,
+        items: newOrder.pricing_type === 'kg' ? `Weight-based service: ${newOrder.total_weight}kg` : newOrder.items,
         status: 'received' as const,
         quality_score: 0,
         date_received: new Date().toISOString()
@@ -155,7 +201,9 @@ const OrderManagement = () => {
         items_detail: {},
         priority: 'normal',
         amount: 0,
-        due_date: ''
+        due_date: '',
+        pricing_type: 'item',
+        total_weight: 0
       });
       
       toast({
@@ -196,7 +244,7 @@ const OrderManagement = () => {
               New Order
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New Order</DialogTitle>
               <DialogDescription>
@@ -210,10 +258,26 @@ const OrderManagement = () => {
                 onNewCustomer={handleNewCustomer}
               />
               
-              <ItemQuantityInput
-                items={newOrder.items_detail}
-                onChange={handleItemsChange}
+              <PricingSelector
+                value={newOrder.pricing_type}
+                onChange={handlePricingTypeChange}
               />
+              
+              {newOrder.pricing_type === 'item' ? (
+                <ItemPricingInput
+                  items={newOrder.items_detail}
+                  onChange={handleItemsChange}
+                  onAmountCalculated={handleAmountCalculated}
+                />
+              ) : (
+                <KgPricingInput
+                  serviceTypeId={newOrder.service_type_id || ''}
+                  weight={newOrder.total_weight || 0}
+                  onServiceTypeChange={(serviceTypeId) => setNewOrder(prev => ({ ...prev, service_type_id: serviceTypeId }))}
+                  onWeightChange={(weight) => setNewOrder(prev => ({ ...prev, total_weight: weight }))}
+                  onAmountCalculated={handleAmountCalculated}
+                />
+              )}
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -230,14 +294,15 @@ const OrderManagement = () => {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Amount ($)</Label>
+                  <Label htmlFor="amount">Amount (₹)</Label>
                   <Input 
                     id="amount" 
                     type="number" 
                     placeholder="0.00" 
                     step="0.01"
                     value={newOrder.amount || ''}
-                    onChange={(e) => setNewOrder(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
+                    readOnly
+                    className="bg-gray-50"
                   />
                 </div>
               </div>
@@ -304,7 +369,8 @@ const OrderManagement = () => {
               <TableRow>
                 <TableHead>Order ID</TableHead>
                 <TableHead>Customer</TableHead>
-                <TableHead>Items</TableHead>
+                <TableHead>Items/Service</TableHead>
+                <TableHead>Pricing</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Priority</TableHead>
                 <TableHead>Due Date</TableHead>
@@ -328,12 +394,20 @@ const OrderManagement = () => {
                   <TableCell>
                     <div>
                       <p className="text-sm">{order.items}</p>
-                      {order.items_detail && Object.keys(order.items_detail).length > 0 && (
+                      {order.pricing_type === 'kg' && order.total_weight && (
+                        <p className="text-xs text-gray-500">{order.total_weight}kg</p>
+                      )}
+                      {order.pricing_type === 'item' && order.items_detail && Object.keys(order.items_detail).length > 0 && (
                         <div className="text-xs text-gray-500 mt-1">
                           {Object.values(order.items_detail).reduce((sum, item) => sum + item.quantity, 0)} items
                         </div>
                       )}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">
+                      {order.pricing_type === 'kg' ? 'By Weight' : 'By Items'}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Badge className={getStatusColor(order.status)}>
@@ -351,7 +425,7 @@ const OrderManagement = () => {
                       {new Date(order.due_date).toLocaleDateString()}
                     </div>
                   </TableCell>
-                  <TableCell>${order.amount.toFixed(2)}</TableCell>
+                  <TableCell>₹{order.amount.toFixed(2)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <div className={`w-2 h-2 rounded-full ${order.quality_score >= 95 ? 'bg-green-500' : order.quality_score >= 90 ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
@@ -366,7 +440,6 @@ const OrderManagement = () => {
             </TableBody>
           </Table>
           
-          {/* Pagination */}
           <div className="mt-6">
             <Pagination
               currentPage={currentPage}

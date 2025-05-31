@@ -57,6 +57,33 @@ export type Database = {
         }
         Relationships: []
       }
+      laundry_items: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean | null
+          name: string
+          price_per_item: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          price_per_item?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          price_per_item?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           amount: number
@@ -71,9 +98,12 @@ export type Database = {
           items: string
           items_detail: Json | null
           order_number: string
+          pricing_type: string | null
           priority: string | null
           quality_score: number | null
+          service_type_id: string | null
           status: string | null
+          total_weight: number | null
           updated_at: string
         }
         Insert: {
@@ -89,9 +119,12 @@ export type Database = {
           items: string
           items_detail?: Json | null
           order_number: string
+          pricing_type?: string | null
           priority?: string | null
           quality_score?: number | null
+          service_type_id?: string | null
           status?: string | null
+          total_weight?: number | null
           updated_at?: string
         }
         Update: {
@@ -107,9 +140,12 @@ export type Database = {
           items?: string
           items_detail?: Json | null
           order_number?: string
+          pricing_type?: string | null
           priority?: string | null
           quality_score?: number | null
+          service_type_id?: string | null
           status?: string | null
+          total_weight?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -118,6 +154,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_service_type_id_fkey"
+            columns: ["service_type_id"]
+            isOneToOne: false
+            referencedRelation: "service_types"
             referencedColumns: ["id"]
           },
         ]
@@ -201,6 +244,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      service_types: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          price_per_kg: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          price_per_kg: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          price_per_kg?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {
