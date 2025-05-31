@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Check, ChevronsUpDown, Plus } from 'lucide-react';
 import { useCustomers } from '@/hooks/useCustomers';
 import { cn } from '@/lib/utils';
@@ -25,7 +25,7 @@ const CustomerSearch = ({ value, onSelect, onNewCustomer }: CustomerSearchProps)
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
 
-  const selectedCustomer = customers.find(customer => customer.id === value);
+  const selectedCustomer = customers.find(customer => customer?.id === value);
 
   const filteredCustomers = customers.filter(customer => {
     if (!customer || !customer.name || !customer.email) return false;
@@ -91,55 +91,57 @@ const CustomerSearch = ({ value, onSelect, onNewCustomer }: CustomerSearchProps)
               value={searchValue}
               onValueChange={setSearchValue}
             />
-            <CommandEmpty>
-              <div className="p-2">
-                <p className="text-sm text-gray-500 mb-2">No customer found.</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowNewCustomerForm(true)}
-                  className="w-full"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add New Customer
-                </Button>
-              </div>
-            </CommandEmpty>
-            <CommandGroup>
-              {filteredCustomers.map((customer) => (
-                <CommandItem
-                  key={customer.id}
-                  value={customer.id}
-                  onSelect={() => {
-                    onSelect(customer.id, customer.name, customer.phone || undefined);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === customer.id ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  <div className="flex flex-col">
-                    <span className="font-medium">{customer.name}</span>
-                    <span className="text-sm text-gray-500">{customer.email}</span>
-                    {customer.phone && (
-                      <span className="text-sm text-gray-500">{customer.phone}</span>
-                    )}
-                  </div>
-                </CommandItem>
-              ))}
-              {filteredCustomers.length > 0 && (
-                <CommandItem
-                  onSelect={() => setShowNewCustomerForm(true)}
-                  className="border-t"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add New Customer
-                </CommandItem>
-              )}
-            </CommandGroup>
+            <CommandList>
+              <CommandEmpty>
+                <div className="p-2">
+                  <p className="text-sm text-gray-500 mb-2">No customer found.</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowNewCustomerForm(true)}
+                    className="w-full"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add New Customer
+                  </Button>
+                </div>
+              </CommandEmpty>
+              <CommandGroup>
+                {filteredCustomers.map((customer) => (
+                  <CommandItem
+                    key={customer.id}
+                    value={customer.id}
+                    onSelect={() => {
+                      onSelect(customer.id, customer.name, customer.phone || undefined);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value === customer.id ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    <div className="flex flex-col">
+                      <span className="font-medium">{customer.name}</span>
+                      <span className="text-sm text-gray-500">{customer.email}</span>
+                      {customer.phone && (
+                        <span className="text-sm text-gray-500">{customer.phone}</span>
+                      )}
+                    </div>
+                  </CommandItem>
+                ))}
+                {filteredCustomers.length > 0 && (
+                  <CommandItem
+                    onSelect={() => setShowNewCustomerForm(true)}
+                    className="border-t"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add New Customer
+                  </CommandItem>
+                )}
+              </CommandGroup>
+            </CommandList>
           </Command>
           
           {showNewCustomerForm && (
