@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Eye, Edit, Trash2, Calendar, FileText, Download } from 'lucide-react';
+import { Eye, Edit, Trash2, Calendar, FileText, Percent } from 'lucide-react';
 import { Order, useUpdateOrderStatus, useDeleteOrder, useUpdateOrder, OrderItem } from '@/hooks/useOrders';
 import { useToast } from '@/hooks/use-toast';
 import CustomerSearch from '@/components/CustomerSearch';
@@ -40,7 +40,10 @@ const OrderActions = ({ order }: OrderActionsProps) => {
     due_date: order.due_date.split('T')[0],
     pricing_type: order.pricing_type,
     service_type_id: order.service_type_id,
-    total_weight: order.total_weight || 0
+    total_weight: order.total_weight || 0,
+    subtotal: (order as any).subtotal || order.amount,
+    discount: (order as any).discount || 0,
+    discount_type: (order as any).discount_type || 'percentage' as 'percentage' | 'fixed'
   });
 
   const getStatusColor = (status: string) => {
@@ -148,7 +151,32 @@ const OrderActions = ({ order }: OrderActionsProps) => {
   const handleAmountCalculated = (amount: number) => {
     setEditData(prev => ({
       ...prev,
-      amount
+      subtotal: amount,
+      amount: calculateFinalAmount(amount, prev.discount, prev.discount_type)
+    }));
+  };
+
+  const calculateFinalAmount = (subtotal: number, discount: number, discountType: 'percentage' | 'fixed') => {
+    if (discountType === 'percentage') {
+      return subtotal - (subtotal * discount / 100);
+    } else {
+      return Math.max(0, subtotal - discount);
+    }
+  };
+
+  const handleDiscountChange = (discount: number) => {
+    setEditData(prev => ({
+      ...prev,
+      discount,
+      amount: calculateFinalAmount(prev.subtotal, discount, prev.discount_type)
+    }));
+  };
+
+  const handleDiscountTypeChange = (discountType: 'percentage' | 'fixed') => {
+    setEditData(prev => ({
+      ...prev,
+      discount_type: discountType,
+      amount: calculateFinalAmount(prev.subtotal, prev.discount, discountType)
     }));
   };
 
@@ -160,7 +188,9 @@ const OrderActions = ({ order }: OrderActionsProps) => {
       items_detail: {},
       service_type_id: undefined,
       total_weight: 0,
-      amount: 0
+      subtotal: 0,
+      amount: 0,
+      discount: 0
     }));
   };
 
@@ -205,7 +235,10 @@ const OrderActions = ({ order }: OrderActionsProps) => {
         due_date: editData.due_date,
         pricing_type: editData.pricing_type,
         service_type_id: editData.service_type_id,
-        total_weight: editData.total_weight
+        total_weight: editData.total_weight,
+        subtotal: editData.subtotal,
+        discount: editData.discount,
+        discount_type: editData.discount_type
       });
       
       toast({
@@ -231,7 +264,7 @@ const OrderActions = ({ order }: OrderActionsProps) => {
     doc.setFont('helvetica', 'bold');
     doc.text('INVOICE', pageWidth / 2, 30, { align: 'center' });
     
-    // Company details (you can customize this)
+    // Company details
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
     doc.text('Laundry Management System', 20, 50);
@@ -281,10 +314,31 @@ const OrderActions = ({ order }: OrderActionsProps) => {
       yPosition += 10;
     }
     
-    // Total
+    // Pricing breakdown
     yPosition += 20;
+    const subtotal = (order as any).subtotal || order.amount;
+    const discount = (order as any).discount || 0;
+    const discountType = (order as any).discount_type || 'percentage';
+    
     doc.line(20, yPosition, pageWidth - 20, yPosition);
     yPosition += 15;
+    
+    // Subtotal
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Subtotal: ₹${subtotal.toFixed(2)}`, pageWidth - 20, yPosition, { align: 'right' });
+    
+    // Discount (if any)
+    if (discount > 0) {
+      yPosition += 10;
+      const discountAmount = discountType === 'percentage' ? (subtotal * discount / 100) : discount;
+      doc.text(`Discount (${discountType === 'percentage' ? `${discount}%` : `₹${discount}`}): -₹${discountAmount.toFixed(2)}`, pageWidth - 20, yPosition, { align: 'right' });
+    }
+    
+    yPosition += 15;
+    doc.line(20, yPosition, pageWidth - 20, yPosition);
+    yPosition += 15;
+    
+    // Final total
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
     doc.text(`Total Amount: ₹${order.amount.toFixed(2)}`, pageWidth - 20, yPosition, { align: 'right' });
@@ -444,6 +498,51 @@ const OrderActions = ({ order }: OrderActionsProps) => {
               />
             )}
             
+            {/* Discount Section */}
+            <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
+              <div className="flex items-center gap-2">
+                <Percent className="h-4 w-4 text-gray-600" />
+                <Label className="text-sm font-medium">Discount</Label>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="discountType">Type</Label>
+                  <Select value={editData.discount_type} onValueChange={handleDiscountTypeChange}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="percentage">Percentage (%)</SelectItem>
+                      <SelectItem value="fixed">Fixed Amount (₹)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="discount">Discount</Label>
+                  <Input
+                    id="discount"
+                    type="number"
+                    placeholder="0"
+                    min="0"
+                    step={editData.discount_type === 'percentage' ? "1" : "0.01"}
+                    max={editData.discount_type === 'percentage' ? "100" : undefined}
+                    value={editData.discount || ''}
+                    onChange={(e) => handleDiscountChange(Number(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="subtotal">Subtotal (₹)</Label>
+                  <Input 
+                    id="subtotal" 
+                    type="number" 
+                    value={editData.subtotal || ''}
+                    readOnly
+                    className="bg-gray-100"
+                  />
+                </div>
+              </div>
+            </div>
+            
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="priority">Priority</Label>
@@ -459,15 +558,14 @@ const OrderActions = ({ order }: OrderActionsProps) => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="amount">Amount (₹)</Label>
+                <Label htmlFor="amount">Final Amount (₹)</Label>
                 <Input 
                   id="amount" 
                   type="number" 
                   placeholder="0.00" 
                   step="0.01"
                   value={editData.amount || ''}
-                  readOnly
-                  className="bg-gray-50"
+                  onChange={(e) => setEditData(prev => ({ ...prev, amount: Number(e.target.value) }))}
                 />
               </div>
             </div>

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Search, Plus, Calendar } from 'lucide-react';
+import { Search, Plus, Calendar, Percent } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useOrders, useCreateOrder, Order, OrderItem } from '@/hooks/useOrders';
 import { useCreateCustomer } from '@/hooks/useCustomers';
@@ -47,6 +47,9 @@ const OrderManagement = () => {
     pricing_type: 'item' | 'kg';
     service_type_id?: string;
     total_weight?: number;
+    subtotal: number;
+    discount: number;
+    discount_type: 'percentage' | 'fixed';
   }>({
     customer_name: '',
     customer_phone: '',
@@ -56,7 +59,10 @@ const OrderManagement = () => {
     amount: 0,
     due_date: '',
     pricing_type: 'item',
-    total_weight: 0
+    total_weight: 0,
+    subtotal: 0,
+    discount: 0,
+    discount_type: 'percentage'
   });
 
   const getStatusColor = (status: string) => {
@@ -141,7 +147,32 @@ const OrderManagement = () => {
   const handleAmountCalculated = (amount: number) => {
     setNewOrder(prev => ({
       ...prev,
-      amount
+      subtotal: amount,
+      amount: calculateFinalAmount(amount, prev.discount, prev.discount_type)
+    }));
+  };
+
+  const calculateFinalAmount = (subtotal: number, discount: number, discountType: 'percentage' | 'fixed') => {
+    if (discountType === 'percentage') {
+      return subtotal - (subtotal * discount / 100);
+    } else {
+      return Math.max(0, subtotal - discount);
+    }
+  };
+
+  const handleDiscountChange = (discount: number) => {
+    setNewOrder(prev => ({
+      ...prev,
+      discount,
+      amount: calculateFinalAmount(prev.subtotal, discount, prev.discount_type)
+    }));
+  };
+
+  const handleDiscountTypeChange = (discountType: 'percentage' | 'fixed') => {
+    setNewOrder(prev => ({
+      ...prev,
+      discount_type: discountType,
+      amount: calculateFinalAmount(prev.subtotal, prev.discount, discountType)
     }));
   };
 
@@ -153,7 +184,9 @@ const OrderManagement = () => {
       items_detail: {},
       service_type_id: undefined,
       total_weight: 0,
-      amount: 0
+      subtotal: 0,
+      amount: 0,
+      discount: 0
     }));
   };
 
@@ -204,7 +237,10 @@ const OrderManagement = () => {
         amount: 0,
         due_date: '',
         pricing_type: 'item',
-        total_weight: 0
+        total_weight: 0,
+        subtotal: 0,
+        discount: 0,
+        discount_type: 'percentage'
       });
       
       toast({
@@ -280,6 +316,51 @@ const OrderManagement = () => {
                 />
               )}
               
+              {/* Discount Section */}
+              <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
+                <div className="flex items-center gap-2">
+                  <Percent className="h-4 w-4 text-gray-600" />
+                  <Label className="text-sm font-medium">Discount</Label>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="discountType">Type</Label>
+                    <Select value={newOrder.discount_type} onValueChange={handleDiscountTypeChange}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="percentage">Percentage (%)</SelectItem>
+                        <SelectItem value="fixed">Fixed Amount (₹)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="discount">Discount</Label>
+                    <Input
+                      id="discount"
+                      type="number"
+                      placeholder="0"
+                      min="0"
+                      step={newOrder.discount_type === 'percentage' ? "1" : "0.01"}
+                      max={newOrder.discount_type === 'percentage' ? "100" : undefined}
+                      value={newOrder.discount || ''}
+                      onChange={(e) => handleDiscountChange(Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="subtotal">Subtotal (₹)</Label>
+                    <Input 
+                      id="subtotal" 
+                      type="number" 
+                      value={newOrder.subtotal || ''}
+                      readOnly
+                      className="bg-gray-100"
+                    />
+                  </div>
+                </div>
+              </div>
+              
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="priority">Priority</Label>
@@ -295,15 +376,14 @@ const OrderManagement = () => {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Amount (₹)</Label>
+                  <Label htmlFor="amount">Final Amount (₹)</Label>
                   <Input 
                     id="amount" 
                     type="number" 
                     placeholder="0.00" 
                     step="0.01"
                     value={newOrder.amount || ''}
-                    readOnly
-                    className="bg-gray-50"
+                    onChange={(e) => setNewOrder(prev => ({ ...prev, amount: Number(e.target.value) }))}
                   />
                 </div>
               </div>
