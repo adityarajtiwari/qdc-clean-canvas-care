@@ -12,7 +12,8 @@ import { useQualityChecks, useCreateQualityCheck } from '@/hooks/useQualityCheck
 import { useToast } from '@/hooks/use-toast';
 
 const QualityControl = () => {
-  const { data: orders = [] } = useOrders();
+  const { data: ordersData } = useOrders();
+  const orders = ordersData?.orders || [];
   const { data: qualityChecks = [] } = useQualityChecks();
   const createQualityCheck = useCreateQualityCheck();
   const { toast } = useToast();
