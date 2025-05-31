@@ -9,13 +9,178 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      customers: {
+        Row: {
+          address: string | null
+          created_at: string
+          email: string
+          id: string
+          last_order_date: string | null
+          loyalty_tier: string | null
+          name: string
+          phone: string | null
+          rating: number | null
+          status: string | null
+          total_orders: number | null
+          total_spent: number | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          last_order_date?: string | null
+          loyalty_tier?: string | null
+          name: string
+          phone?: string | null
+          rating?: number | null
+          status?: string | null
+          total_orders?: number | null
+          total_spent?: number | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          last_order_date?: string | null
+          loyalty_tier?: string | null
+          name?: string
+          phone?: string | null
+          rating?: number | null
+          status?: string | null
+          total_orders?: number | null
+          total_spent?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      orders: {
+        Row: {
+          amount: number
+          completed_date: string | null
+          created_at: string
+          customer_id: string | null
+          customer_name: string
+          customer_phone: string | null
+          date_received: string
+          due_date: string
+          id: string
+          items: string
+          order_number: string
+          priority: string | null
+          quality_score: number | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          completed_date?: string | null
+          created_at?: string
+          customer_id?: string | null
+          customer_name: string
+          customer_phone?: string | null
+          date_received?: string
+          due_date: string
+          id?: string
+          items: string
+          order_number: string
+          priority?: string | null
+          quality_score?: number | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          completed_date?: string | null
+          created_at?: string
+          customer_id?: string | null
+          customer_name?: string
+          customer_phone?: string | null
+          date_received?: string
+          due_date?: string
+          id?: string
+          items?: string
+          order_number?: string
+          priority?: string | null
+          quality_score?: number | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quality_checks: {
+        Row: {
+          check_type: string
+          checked_at: string | null
+          created_at: string
+          customer_name: string
+          id: string
+          inspector: string | null
+          issues: string[] | null
+          notes: string | null
+          order_id: string | null
+          order_number: string
+          score: number | null
+          status: string | null
+        }
+        Insert: {
+          check_type: string
+          checked_at?: string | null
+          created_at?: string
+          customer_name: string
+          id?: string
+          inspector?: string | null
+          issues?: string[] | null
+          notes?: string | null
+          order_id?: string | null
+          order_number: string
+          score?: number | null
+          status?: string | null
+        }
+        Update: {
+          check_type?: string
+          checked_at?: string | null
+          created_at?: string
+          customer_name?: string
+          id?: string
+          inspector?: string | null
+          issues?: string[] | null
+          notes?: string | null
+          order_id?: string | null
+          order_number?: string
+          score?: number | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_checks_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_order_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

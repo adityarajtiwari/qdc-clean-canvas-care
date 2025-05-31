@@ -10,50 +10,25 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Search, Plus, Eye, Edit, Trash2, Calendar } from 'lucide-react';
+import { useOrders, useCreateOrder } from '@/hooks/useOrders';
+import { useToast } from '@/hooks/use-toast';
 
 const OrderManagement = () => {
-  const [orders, setOrders] = useState([
-    {
-      id: 'ORD-001',
-      customer: 'John Smith',
-      phone: '+1-555-0123',
-      items: 'Shirts (3), Pants (2)',
-      status: 'processing',
-      priority: 'normal',
-      dateReceived: '2024-01-15',
-      dueDate: '2024-01-17',
-      amount: 45.50,
-      qualityScore: 98
-    },
-    {
-      id: 'ORD-002',
-      customer: 'Sarah Johnson',
-      phone: '+1-555-0124',
-      items: 'Dress (1), Blazer (1)',
-      status: 'ready',
-      priority: 'urgent',
-      dateReceived: '2024-01-14',
-      dueDate: '2024-01-16',
-      amount: 65.00,
-      qualityScore: 96
-    },
-    {
-      id: 'ORD-003',
-      customer: 'Mike Davis',
-      phone: '+1-555-0125',
-      items: 'Suit (1), Ties (2)',
-      status: 'completed',
-      priority: 'normal',
-      dateReceived: '2024-01-13',
-      dueDate: '2024-01-15',
-      amount: 85.00,
-      qualityScore: 100
-    }
-  ]);
+  const { data: orders = [], isLoading } = useOrders();
+  const createOrder = useCreateOrder();
+  const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
+  const [newOrder, setNewOrder] = useState({
+    customer_name: '',
+    customer_phone: '',
+    items: '',
+    priority: 'normal' as const,
+    amount: 0,
+    due_date: ''
+  });
 
   const getStatusColor = (status: string) => {
     const colors = {
@@ -76,11 +51,62 @@ const OrderManagement = () => {
   };
 
   const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = order.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         order.order_number.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const handleCreateOrder = async () => {
+    if (!newOrder.customer_name || !newOrder.items || !newOrder.due_date || newOrder.amount <= 0) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      await createOrder.mutateAsync({
+        ...newOrder,
+        status: 'received' as const,
+        quality_score: 0,
+        date_received: new Date().toISOString()
+      });
+      
+      setIsNewOrderOpen(false);
+      setNewOrder({
+        customer_name: '',
+        customer_phone: '',
+        items: '',
+        priority: 'normal',
+        amount: 0,
+        due_date: ''
+      });
+      
+      toast({
+        title: "Success",
+        description: "Order created successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create order",
+        variant: "destructive"
+      });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
+        <div className="text-center py-20">
+          <p className="text-gray-600">Loading orders...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -108,21 +134,36 @@ const OrderManagement = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="customer">Customer Name</Label>
-                  <Input id="customer" placeholder="Enter customer name" />
+                  <Input 
+                    id="customer" 
+                    placeholder="Enter customer name"
+                    value={newOrder.customer_name}
+                    onChange={(e) => setNewOrder(prev => ({ ...prev, customer_name: e.target.value }))}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone Number</Label>
-                  <Input id="phone" placeholder="Enter phone number" />
+                  <Input 
+                    id="phone" 
+                    placeholder="Enter phone number"
+                    value={newOrder.customer_phone}
+                    onChange={(e) => setNewOrder(prev => ({ ...prev, customer_phone: e.target.value }))}
+                  />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="items">Items Description</Label>
-                <Textarea id="items" placeholder="Describe the items (e.g., Shirts (3), Pants (2))" />
+                <Textarea 
+                  id="items" 
+                  placeholder="Describe the items (e.g., Shirts (3), Pants (2))"
+                  value={newOrder.items}
+                  onChange={(e) => setNewOrder(prev => ({ ...prev, items: e.target.value }))}
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="priority">Priority</Label>
-                  <Select>
+                  <Select value={newOrder.priority} onValueChange={(value: 'low' | 'normal' | 'urgent') => setNewOrder(prev => ({ ...prev, priority: value }))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select priority" />
                     </SelectTrigger>
@@ -135,20 +176,32 @@ const OrderManagement = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="amount">Amount ($)</Label>
-                  <Input id="amount" type="number" placeholder="0.00" step="0.01" />
+                  <Input 
+                    id="amount" 
+                    type="number" 
+                    placeholder="0.00" 
+                    step="0.01"
+                    value={newOrder.amount || ''}
+                    onChange={(e) => setNewOrder(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
+                  />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="dueDate">Due Date</Label>
-                <Input id="dueDate" type="date" />
+                <Input 
+                  id="dueDate" 
+                  type="date"
+                  value={newOrder.due_date}
+                  onChange={(e) => setNewOrder(prev => ({ ...prev, due_date: e.target.value }))}
+                />
               </div>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setIsNewOrderOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={() => setIsNewOrderOpen(false)}>
-                Create Order
+              <Button onClick={handleCreateOrder} disabled={createOrder.isPending}>
+                {createOrder.isPending ? 'Creating...' : 'Create Order'}
               </Button>
             </div>
           </DialogContent>
@@ -208,11 +261,13 @@ const OrderManagement = () => {
             <TableBody>
               {filteredOrders.map((order) => (
                 <TableRow key={order.id}>
-                  <TableCell className="font-medium">{order.id}</TableCell>
+                  <TableCell className="font-medium">{order.order_number}</TableCell>
                   <TableCell>
                     <div>
-                      <p className="font-medium">{order.customer}</p>
-                      <p className="text-sm text-gray-600">{order.phone}</p>
+                      <p className="font-medium">{order.customer_name}</p>
+                      {order.customer_phone && (
+                        <p className="text-sm text-gray-600">{order.customer_phone}</p>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>{order.items}</TableCell>
@@ -229,14 +284,14 @@ const OrderManagement = () => {
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Calendar className="h-4 w-4 text-gray-400" />
-                      {order.dueDate}
+                      {new Date(order.due_date).toLocaleDateString()}
                     </div>
                   </TableCell>
                   <TableCell>${order.amount.toFixed(2)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${order.qualityScore >= 95 ? 'bg-green-500' : order.qualityScore >= 90 ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
-                      {order.qualityScore}%
+                      <div className={`w-2 h-2 rounded-full ${order.quality_score >= 95 ? 'bg-green-500' : order.quality_score >= 90 ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
+                      {order.quality_score}%
                     </div>
                   </TableCell>
                   <TableCell>

@@ -2,17 +2,23 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { CheckCircle, XCircle, AlertTriangle, Camera, FileText, Star } from 'lucide-react';
+import { useOrders } from '@/hooks/useOrders';
+import { useQualityChecks, useCreateQualityCheck } from '@/hooks/useQualityChecks';
+import { useToast } from '@/hooks/use-toast';
 
 const QualityControl = () => {
+  const { data: orders = [] } = useOrders();
+  const { data: qualityChecks = [] } = useQualityChecks();
+  const createQualityCheck = useCreateQualityCheck();
+  const { toast } = useToast();
+
   const [selectedOrder, setSelectedOrder] = useState('');
-  const [qualityChecks, setQualityChecks] = useState({
+  const [qualityCheckItems, setQualityCheckItems] = useState({
     stainRemoval: false,
     fabricCare: false,
     colorIntegrity: false,
@@ -23,53 +29,145 @@ const QualityControl = () => {
   const [rating, setRating] = useState(0);
   const [notes, setNotes] = useState('');
 
-  const pendingOrders = [
-    { id: 'ORD-001', customer: 'John Smith', items: 'Shirts (3), Pants (2)' },
-    { id: 'ORD-002', customer: 'Sarah Johnson', items: 'Dress (1), Blazer (1)' },
-    { id: 'ORD-003', customer: 'Mike Davis', items: 'Suit (1), Ties (2)' }
-  ];
-
-  const recentInspections = [
-    {
-      id: 'ORD-098',
-      customer: 'Alice Wilson',
-      inspector: 'Jane Doe',
-      score: 98,
-      status: 'passed',
-      issues: [],
-      timestamp: '2024-01-15 14:30'
-    },
-    {
-      id: 'ORD-097',
-      customer: 'Bob Miller',
-      inspector: 'John Smith',
-      score: 85,
-      status: 'passed',
-      issues: ['Minor wrinkle on collar'],
-      timestamp: '2024-01-15 13:15'
-    },
-    {
-      id: 'ORD-096',
-      customer: 'Carol Brown',
-      inspector: 'Jane Doe',
-      score: 70,
-      status: 'failed',
-      issues: ['Stain not fully removed', 'Fabric pilling'],
-      timestamp: '2024-01-15 11:45'
-    }
-  ];
+  // Get pending orders (not completed)
+  const pendingOrders = orders.filter(order => order.status !== 'completed');
+  
+  // Get recent quality checks
+  const recentInspections = qualityChecks.slice(0, 3).map(check => ({
+    id: check.order_number,
+    customer: check.customer_name,
+    inspector: check.inspector || 'System',
+    score: check.score,
+    status: check.status,
+    issues: check.issues || [],
+    timestamp: new Date(check.checked_at).toLocaleString()
+  }));
 
   const handleQualityCheck = (check: string, value: boolean) => {
-    setQualityChecks(prev => ({
+    setQualityCheckItems(prev => ({
       ...prev,
       [check]: value
     }));
   };
 
   const calculateScore = () => {
-    const checkedItems = Object.values(qualityChecks).filter(Boolean).length;
-    const totalItems = Object.keys(qualityChecks).length;
+    const checkedItems = Object.values(qualityCheckItems).filter(Boolean).length;
+    const totalItems = Object.keys(qualityCheckItems).length;
     return Math.round((checkedItems / totalItems) * 100);
+  };
+
+  const handlePassInspection = async () => {
+    if (!selectedOrder) {
+      toast({
+        title: "Error",
+        description: "Please select an order first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const order = orders.find(o => o.order_number === selectedOrder);
+    if (!order) return;
+
+    const issues = Object.entries(qualityCheckItems)
+      .filter(([_, checked]) => !checked)
+      .map(([key, _]) => key.replace(/([A-Z])/g, ' $1').trim());
+
+    try {
+      await createQualityCheck.mutateAsync({
+        order_id: order.id,
+        order_number: order.order_number,
+        customer_name: order.customer_name,
+        check_type: 'final',
+        status: 'passed',
+        score: calculateScore(),
+        issues: issues.length > 0 ? issues : undefined,
+        notes: notes || undefined,
+        inspector: 'Quality Inspector',
+        checked_at: new Date().toISOString()
+      });
+
+      // Reset form
+      setSelectedOrder('');
+      setQualityCheckItems({
+        stainRemoval: false,
+        fabricCare: false,
+        colorIntegrity: false,
+        pressing: false,
+        packaging: false,
+        overallCleanliness: false
+      });
+      setRating(0);
+      setNotes('');
+
+      toast({
+        title: "Success",
+        description: "Quality inspection passed successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save quality inspection",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleFailInspection = async () => {
+    if (!selectedOrder) {
+      toast({
+        title: "Error",
+        description: "Please select an order first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const order = orders.find(o => o.order_number === selectedOrder);
+    if (!order) return;
+
+    const issues = Object.entries(qualityCheckItems)
+      .filter(([_, checked]) => !checked)
+      .map(([key, _]) => key.replace(/([A-Z])/g, ' $1').trim());
+
+    try {
+      await createQualityCheck.mutateAsync({
+        order_id: order.id,
+        order_number: order.order_number,
+        customer_name: order.customer_name,
+        check_type: 'final',
+        status: 'failed',
+        score: calculateScore(),
+        issues: issues,
+        notes: notes || undefined,
+        inspector: 'Quality Inspector',
+        checked_at: new Date().toISOString()
+      });
+
+      // Reset form
+      setSelectedOrder('');
+      setQualityCheckItems({
+        stainRemoval: false,
+        fabricCare: false,
+        colorIntegrity: false,
+        pressing: false,
+        packaging: false,
+        overallCleanliness: false
+      });
+      setRating(0);
+      setNotes('');
+
+      toast({
+        title: "Inspection Failed",
+        description: "Quality inspection marked as failed"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save quality inspection",
+        variant: "destructive"
+      });
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -86,6 +184,13 @@ const QualityControl = () => {
     if (score >= 85) return 'text-yellow-600';
     return 'text-red-600';
   };
+
+  // Calculate statistics
+  const totalInspections = qualityChecks.length;
+  const passedInspections = qualityChecks.filter(q => q.status === 'passed').length;
+  const failedInspections = qualityChecks.filter(q => q.status === 'failed').length;
+  const averageScore = qualityChecks.length > 0 ? 
+    (qualityChecks.reduce((sum, q) => sum + q.score, 0) / qualityChecks.length).toFixed(1) : '0.0';
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -113,8 +218,8 @@ const QualityControl = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {pendingOrders.map((order) => (
-                    <SelectItem key={order.id} value={order.id}>
-                      {order.id} - {order.customer} ({order.items})
+                    <SelectItem key={order.id} value={order.order_number}>
+                      {order.order_number} - {order.customer_name} ({order.items})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -126,7 +231,7 @@ const QualityControl = () => {
                 <div className="space-y-4">
                   <h3 className="font-semibold text-lg">Quality Checklist</h3>
                   <div className="space-y-3">
-                    {Object.entries(qualityChecks).map(([key, checked]) => (
+                    {Object.entries(qualityCheckItems).map(([key, checked]) => (
                       <div key={key} className="flex items-center space-x-2">
                         <Checkbox
                           id={key}
@@ -175,18 +280,27 @@ const QualityControl = () => {
                     </span>
                   </div>
                   <div className="text-sm text-gray-600">
-                    Based on checklist completion ({Object.values(qualityChecks).filter(Boolean).length}/{Object.keys(qualityChecks).length} items)
+                    Based on checklist completion ({Object.values(qualityCheckItems).filter(Boolean).length}/{Object.keys(qualityCheckItems).length} items)
                   </div>
                 </div>
 
                 <div className="flex gap-3">
-                  <Button className="flex-1 bg-green-600 hover:bg-green-700">
+                  <Button 
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    onClick={handlePassInspection}
+                    disabled={createQualityCheck.isPending}
+                  >
                     <CheckCircle className="h-4 w-4 mr-2" />
-                    Pass Inspection
+                    {createQualityCheck.isPending ? 'Saving...' : 'Pass Inspection'}
                   </Button>
-                  <Button variant="outline" className="flex-1 border-red-300 text-red-600 hover:bg-red-50">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+                    onClick={handleFailInspection}
+                    disabled={createQualityCheck.isPending}
+                  >
                     <XCircle className="h-4 w-4 mr-2" />
-                    Fail Inspection
+                    {createQualityCheck.isPending ? 'Saving...' : 'Fail Inspection'}
                   </Button>
                 </div>
 
@@ -263,25 +377,25 @@ const QualityControl = () => {
       {/* Quality Statistics */}
       <Card>
         <CardHeader>
-          <CardTitle>Quality Statistics (Last 30 Days)</CardTitle>
+          <CardTitle>Quality Statistics</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-3xl font-bold text-green-600">96.2%</div>
+              <div className="text-3xl font-bold text-green-600">{averageScore}%</div>
               <div className="text-sm text-gray-600">Average Quality Score</div>
             </div>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-3xl font-bold text-blue-600">847</div>
+              <div className="text-3xl font-bold text-blue-600">{totalInspections}</div>
               <div className="text-sm text-gray-600">Total Inspections</div>
             </div>
             <div className="text-center p-4 bg-red-50 rounded-lg">
-              <div className="text-3xl font-bold text-red-600">23</div>
+              <div className="text-3xl font-bold text-red-600">{failedInspections}</div>
               <div className="text-sm text-gray-600">Failed Inspections</div>
             </div>
-            <div className="text-center p-4 bg-yellow-50 rounded-lg">
-              <div className="text-3xl font-bold text-yellow-600">12</div>
-              <div className="text-sm text-gray-600">Items Under Review</div>
+            <div className="text-center p-4 bg-green-50 rounded-lg">
+              <div className="text-3xl font-bold text-green-600">{passedInspections}</div>
+              <div className="text-sm text-gray-600">Passed Inspections</div>
             </div>
           </div>
         </CardContent>
