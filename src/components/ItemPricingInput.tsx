@@ -5,8 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trash2, Plus } from 'lucide-react';
-import { useLaundryItems } from '@/hooks/useLaundryItems';
+import { Trash, Plus } from 'lucide-react';
+import { useActiveItemsOnly } from '@/hooks/useLaundryItems';
 import { OrderItem } from '@/hooks/useOrders';
 
 interface ItemPricingInputProps {
@@ -16,7 +16,7 @@ interface ItemPricingInputProps {
 }
 
 const ItemPricingInput = ({ items, onChange, onAmountCalculated }: ItemPricingInputProps) => {
-  const { data: laundryItems, isLoading } = useLaundryItems();
+  const { data: laundryItems, isLoading } = useActiveItemsOnly();
   const [selectedItem, setSelectedItem] = useState('');
   const [quantity, setQuantity] = useState(1);
 
@@ -146,7 +146,7 @@ const ItemPricingInput = ({ items, onChange, onAmountCalculated }: ItemPricingIn
                       onClick={() => removeItem(itemId)}
                       className="text-red-600"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash className="h-4 w-4" />
                     </Button>
                   </TableCell>
                 </TableRow>

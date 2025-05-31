@@ -28,6 +28,21 @@ export const useLaundryItems = () => {
       const { data, error } = await supabase
         .from('laundry_items')
         .select('*')
+        .order('name');
+
+      if (error) throw error;
+      return data as LaundryItem[];
+    },
+  });
+};
+
+export const useActiveItemsOnly = () => {
+  return useQuery({
+    queryKey: ['laundryItems', 'active'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('laundry_items')
+        .select('*')
         .eq('is_active', true)
         .order('name');
 
@@ -40,6 +55,21 @@ export const useLaundryItems = () => {
 export const useServiceTypes = () => {
   return useQuery({
     queryKey: ['serviceTypes'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('service_types')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      return data as ServiceType[];
+    },
+  });
+};
+
+export const useActiveServicesOnly = () => {
+  return useQuery({
+    queryKey: ['serviceTypes', 'active'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('service_types')

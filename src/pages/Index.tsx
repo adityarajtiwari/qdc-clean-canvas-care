@@ -6,6 +6,7 @@ import OrderManagement from "@/components/OrderManagement";
 import CustomerManagement from "@/components/CustomerManagement";
 import QualityControl from "@/components/QualityControl";
 import InventoryManagement from "@/components/InventoryManagement";
+import PricingManagement from "@/components/PricingManagement";
 import Navigation from "@/components/Navigation";
 
 const Index = () => {
@@ -21,7 +22,7 @@ const Index = () => {
             <TabsTrigger value="orders">Orders</TabsTrigger>
             <TabsTrigger value="customers">Customers</TabsTrigger>
             <TabsTrigger value="inventory">Inventory</TabsTrigger>
-            <TabsTrigger value="quality">Quality</TabsTrigger>
+            <TabsTrigger value="pricing">Pricing</TabsTrigger>
           </TabsList>
           
           <TabsContent value="dashboard">
@@ -40,8 +41,8 @@ const Index = () => {
             <InventoryManagement />
           </TabsContent>
           
-          <TabsContent value="quality">
-            <QualityControl />
+          <TabsContent value="pricing">
+            <PricingManagement />
           </TabsContent>
         </Tabs>
       </main>
