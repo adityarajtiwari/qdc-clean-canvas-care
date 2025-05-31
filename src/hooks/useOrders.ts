@@ -57,7 +57,8 @@ export const useOrders = (page: number = 1, limit: number = 10, searchTerm?: str
       // Transform the data to match our Order interface
       const transformedData: Order[] = (data || []).map(order => ({
         ...order,
-        items_detail: order.items_detail as Record<string, OrderItem> || {}
+        status: order.status as Order['status'],
+        items_detail: (order.items_detail as unknown as Record<string, OrderItem>) || {}
       }));
 
       return { 
