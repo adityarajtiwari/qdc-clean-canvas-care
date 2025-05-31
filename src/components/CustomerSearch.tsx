@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,7 +16,9 @@ interface CustomerSearchProps {
 }
 
 const CustomerSearch = ({ value, onSelect, onNewCustomer }: CustomerSearchProps) => {
-  const { data: customers = [] } = useCustomers();
+  const { data: customersData, isLoading, error } = useCustomers();
+  const customers = customersData || [];
+  
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
@@ -25,11 +27,12 @@ const CustomerSearch = ({ value, onSelect, onNewCustomer }: CustomerSearchProps)
 
   const selectedCustomer = customers.find(customer => customer.id === value);
 
-  const filteredCustomers = customers.filter(customer =>
-    customer.name.toLowerCase().includes(searchValue.toLowerCase()) ||
-    customer.email.toLowerCase().includes(searchValue.toLowerCase()) ||
-    (customer.phone && customer.phone.includes(searchValue))
-  );
+  const filteredCustomers = customers.filter(customer => {
+    const searchLower = searchValue.toLowerCase();
+    return customer.name.toLowerCase().includes(searchLower) ||
+           customer.email.toLowerCase().includes(searchLower) ||
+           (customer.phone && customer.phone.includes(searchValue));
+  });
 
   const handleNewCustomerSubmit = () => {
     if (!newCustomerName.trim()) return;
@@ -40,6 +43,28 @@ const CustomerSearch = ({ value, onSelect, onNewCustomer }: CustomerSearchProps)
     setShowNewCustomerForm(false);
     setOpen(false);
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        <Label>Customer</Label>
+        <Button variant="outline" className="w-full justify-between" disabled>
+          Loading customers...
+        </Button>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-2">
+        <Label>Customer</Label>
+        <Button variant="outline" className="w-full justify-between" disabled>
+          Error loading customers
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">
