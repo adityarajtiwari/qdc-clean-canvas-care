@@ -8,7 +8,7 @@ import {
   CheckCircle, 
   Users, 
   Warehouse, 
-  Settings,
+  DollarSign,
   Bell,
   User,
   LogOut
@@ -31,7 +31,7 @@ const Navigation = ({ currentPage, onPageChange }: NavigationProps) => {
     { id: 'quality', label: 'Quality Control', icon: CheckCircle, badge: '3' },
     { id: 'customers', label: 'Customers', icon: Users },
     { id: 'inventory', label: 'Inventory', icon: Warehouse },
-    { id: 'settings', label: 'Settings', icon: Settings }
+    { id: 'pricing', label: 'Pricing', icon: DollarSign }
   ];
 
   const handleSignOut = async () => {
