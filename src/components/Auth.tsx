@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { LogIn, UserPlus } from 'lucide-react';
+import { LogIn, UserPlus, Loader2 } from 'lucide-react';
 
 const Auth = () => {
   const { signIn, signUp } = useAuth();
@@ -65,6 +65,15 @@ const Auth = () => {
       return;
     }
 
+    if (signUpData.password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     const { error } = await signUp(signUpData.email, signUpData.password, signUpData.fullName);
     
@@ -110,6 +119,7 @@ const Auth = () => {
                     placeholder="Enter your email"
                     value={signInData.email}
                     onChange={(e) => setSignInData(prev => ({ ...prev, email: e.target.value }))}
+                    required
                   />
                 </div>
                 <div className="space-y-2">
@@ -120,11 +130,21 @@ const Auth = () => {
                     placeholder="Enter your password"
                     value={signInData.password}
                     onChange={(e) => setSignInData(prev => ({ ...prev, password: e.target.value }))}
+                    required
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
-                  <LogIn className="h-4 w-4 mr-2" />
-                  {loading ? 'Signing in...' : 'Sign In'}
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    <>
+                      <LogIn className="h-4 w-4 mr-2" />
+                      Sign In
+                    </>
+                  )}
                 </Button>
               </form>
             </TabsContent>
@@ -139,6 +159,7 @@ const Auth = () => {
                     placeholder="Enter your full name"
                     value={signUpData.fullName}
                     onChange={(e) => setSignUpData(prev => ({ ...prev, fullName: e.target.value }))}
+                    required
                   />
                 </div>
                 <div className="space-y-2">
@@ -149,6 +170,7 @@ const Auth = () => {
                     placeholder="Enter your email"
                     value={signUpData.email}
                     onChange={(e) => setSignUpData(prev => ({ ...prev, email: e.target.value }))}
+                    required
                   />
                 </div>
                 <div className="space-y-2">
@@ -156,14 +178,25 @@ const Auth = () => {
                   <Input
                     id="signup-password"
                     type="password"
-                    placeholder="Create a password"
+                    placeholder="Create a password (min 6 characters)"
                     value={signUpData.password}
                     onChange={(e) => setSignUpData(prev => ({ ...prev, password: e.target.value }))}
+                    required
+                    minLength={6}
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  {loading ? 'Creating account...' : 'Sign Up'}
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creating account...
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Sign Up
+                    </>
+                  )}
                 </Button>
               </form>
             </TabsContent>
