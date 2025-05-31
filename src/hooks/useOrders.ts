@@ -26,6 +26,9 @@ export interface Order {
   pricing_type: 'item' | 'kg';
   service_type_id?: string;
   total_weight?: number;
+  subtotal?: number;
+  discount?: number;
+  discount_type?: 'percentage' | 'fixed';
   created_at: string;
   updated_at: string;
 }
