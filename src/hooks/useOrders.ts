@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -133,7 +134,9 @@ export const useCreateOrder = () => {
           quantity: item.quantity,
           price_per_item: item.price || 0,
           total_price: (item.quantity * (item.price || 0)),
-          payment_pending: true
+          payment_pending: true,
+          notes: item.notes || null,
+          tags: item.tags || []
         }));
 
         const { error: itemsError } = await supabase
