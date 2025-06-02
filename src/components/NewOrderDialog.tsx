@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -183,9 +182,7 @@ const NewOrderDialog = ({ open, onOpenChange }: NewOrderDialogProps) => {
         total_weight: formData.total_weight,
         subtotal: formData.subtotal,
         discount: formData.discount,
-        discount_type: formData.discount_type,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        discount_type: formData.discount_type
       });
       
       toast({
