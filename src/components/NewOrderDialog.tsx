@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Plus, Percent } from 'lucide-react';
 import CustomerSearch from '@/components/CustomerSearch';
 import PricingSelector from '@/components/PricingSelector';
-import ItemQuantityInputWithNotes from '@/components/ItemQuantityInputWithNotes';
+import ItemPricingInput from '@/components/ItemPricingInput';
 import WeightBasedItemList from '@/components/WeightBasedItemList';
 import KgPricingInput from '@/components/KgPricingInput';
 
@@ -272,25 +271,11 @@ const NewOrderDialog = ({ open, onOpenChange }: NewOrderDialogProps) => {
           {/* Pricing Input */}
           {formData.pricing_type === 'item' ? (
             <div className="space-y-4">
-              <ItemQuantityInputWithNotes
+              <ItemPricingInput
                 items={formData.items_detail}
                 onChange={handleItemsChange}
+                onAmountCalculated={handleAmountCalculated}
               />
-              {Object.keys(formData.items_detail).length > 0 && (
-                <div className="p-4 border rounded-lg bg-blue-50">
-                  <Label className="text-sm font-medium">Total Amount Calculation</Label>
-                  <p className="text-xs text-gray-600 mt-1">
-                    Individual item pricing will be calculated based on predefined rates
-                  </p>
-                  <Input
-                    type="number"
-                    placeholder="Enter total amount"
-                    value={formData.subtotal || ''}
-                    onChange={(e) => handleAmountCalculated(Number(e.target.value))}
-                    className="mt-2"
-                  />
-                </div>
-              )}
             </div>
           ) : (
             <div className="space-y-4">

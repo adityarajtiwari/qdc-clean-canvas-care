@@ -17,26 +17,28 @@ interface ItemPricingInputProps {
 
 const ItemPricingInput = ({ items, onChange, onAmountCalculated }: ItemPricingInputProps) => {
   const { data: laundryItems, isLoading } = useActiveItemsOnly();
-  const [selectedItem, setSelectedItem] = useState('');
+  const [selectedItemId, setSelectedItemId] = useState('');
   const [quantity, setQuantity] = useState(1);
 
   const addItem = () => {
-    if (!selectedItem || quantity <= 0) return;
+    if (!selectedItemId || quantity <= 0) return;
     
-    const item = laundryItems?.find(l => l.id === selectedItem);
-    if (!item) return;
+    const selectedLaundryItem = laundryItems?.find(l => l.id === selectedItemId);
+    if (!selectedLaundryItem) return;
 
     const newItems = {
       ...items,
-      [selectedItem]: {
-        name: item.name,
-        quantity: (items[selectedItem]?.quantity || 0) + quantity,
-        price: item.price_per_item
+      [selectedItemId]: {
+        name: selectedLaundryItem.name,
+        quantity: (items[selectedItemId]?.quantity || 0) + quantity,
+        price: selectedLaundryItem.price_per_item,
+        notes: items[selectedItemId]?.notes || '',
+        tags: items[selectedItemId]?.tags || []
       }
     };
     
     onChange(newItems);
-    setSelectedItem('');
+    setSelectedItemId('');
     setQuantity(1);
   };
 
@@ -82,7 +84,7 @@ const ItemPricingInput = ({ items, onChange, onAmountCalculated }: ItemPricingIn
       <div className="flex gap-4 items-end">
         <div className="flex-1 space-y-2">
           <Label>Select Item</Label>
-          <Select value={selectedItem} onValueChange={setSelectedItem}>
+          <Select value={selectedItemId} onValueChange={setSelectedItemId}>
             <SelectTrigger>
               <SelectValue placeholder="Choose laundry item" />
             </SelectTrigger>
@@ -106,7 +108,7 @@ const ItemPricingInput = ({ items, onChange, onAmountCalculated }: ItemPricingIn
           />
         </div>
         
-        <Button onClick={addItem} disabled={!selectedItem}>
+        <Button onClick={addItem} disabled={!selectedItemId}>
           <Plus className="h-4 w-4 mr-2" />
           Add
         </Button>

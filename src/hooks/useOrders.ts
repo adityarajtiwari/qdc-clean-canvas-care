@@ -6,6 +6,7 @@ export interface OrderItem {
   quantity: number;
   notes?: string;
   tags?: string[];
+  price?: number; // Added back for item-based pricing
 }
 
 export interface Order {
