@@ -22,6 +22,9 @@ const OrderActions = ({ order }: OrderActionsProps) => {
   const deleteOrder = useDeleteOrder();
   const { toast } = useToast();
 
+  console.log('OrderActions rendered for order:', order.id);
+  console.log('showPaymentDialog state:', showPaymentDialog);
+
   const handleStatusUpdate = async () => {
     try {
       await updateStatus.mutateAsync({ id: order.id, status: newStatus });
@@ -57,6 +60,16 @@ const OrderActions = ({ order }: OrderActionsProps) => {
     }
   };
 
+  const handlePaymentDetailsClick = () => {
+    console.log('Payment Details clicked for order:', order.id);
+    setShowPaymentDialog(true);
+  };
+
+  const handlePaymentDialogClose = (open: boolean) => {
+    console.log('Payment dialog close called with:', open);
+    setShowPaymentDialog(open);
+  };
+
   return (
     <>
       <DropdownMenu>
@@ -66,12 +79,12 @@ const OrderActions = ({ order }: OrderActionsProps) => {
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" className="bg-white border shadow-lg z-50">
           <DropdownMenuItem onClick={() => setShowStatusDialog(true)}>
             <Edit className="mr-2 h-4 w-4" />
             Update Status
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setShowPaymentDialog(true)}>
+          <DropdownMenuItem onClick={handlePaymentDetailsClick}>
             <CreditCard className="mr-2 h-4 w-4" />
             Payment Details
           </DropdownMenuItem>
@@ -83,7 +96,7 @@ const OrderActions = ({ order }: OrderActionsProps) => {
       </DropdownMenu>
 
       <Dialog open={showStatusDialog} onOpenChange={setShowStatusDialog}>
-        <DialogContent>
+        <DialogContent className="bg-white">
           <DialogHeader>
             <DialogTitle>Update Order Status</DialogTitle>
             <DialogDescription>
@@ -117,7 +130,7 @@ const OrderActions = ({ order }: OrderActionsProps) => {
 
       <PaymentDetailsDialog 
         open={showPaymentDialog}
-        onOpenChange={setShowPaymentDialog}
+        onOpenChange={handlePaymentDialogClose}
         order={order}
       />
     </>

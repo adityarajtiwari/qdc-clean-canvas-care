@@ -22,6 +22,9 @@ const PaymentDetailsDialog = ({ open, onOpenChange, order }: PaymentDetailsDialo
   const updatePayment = useUpdateOrderItemPayment();
   const { toast } = useToast();
 
+  console.log('PaymentDetailsDialog rendered with open:', open);
+  console.log('Order items:', orderItems);
+
   const handlePaymentStatusChange = async (itemId: string, paymentPending: boolean) => {
     try {
       await updatePayment.mutateAsync({ id: itemId, payment_pending: paymentPending });
@@ -30,6 +33,7 @@ const PaymentDetailsDialog = ({ open, onOpenChange, order }: PaymentDetailsDialo
         description: `Payment status updated successfully`,
       });
     } catch (error) {
+      console.error('Payment update error:', error);
       toast({
         title: "Error",
         description: "Failed to update payment status",
@@ -60,7 +64,7 @@ const PaymentDetailsDialog = ({ open, onOpenChange, order }: PaymentDetailsDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-white z-50">
         <DialogHeader>
           <DialogTitle>Order Details & Payment Status</DialogTitle>
           <DialogDescription>
