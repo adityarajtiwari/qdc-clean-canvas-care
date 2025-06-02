@@ -1,18 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
+import React, { useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { useUpdateOrder, useUpdateOrderStatus, Order } from '@/hooks/useOrders';
-import { useOrderItems, useUpdateOrderItemPayment, useCreateOrderItems } from '@/hooks/useOrderItems';
-import { useLaundryItems, useServiceTypes } from '@/hooks/useLaundryItems';
+import { useOrderItems, useUpdateOrderItemPayment } from '@/hooks/useOrderItems';
+import { useUpdateOrder, Order, OrderItem } from '@/hooks/useOrders';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Trash2, Save, Package, CreditCard, CheckCircle, XCircle } from 'lucide-react';
+import { Edit, Percent, Package, Scale } from 'lucide-react';
+import CustomerSearch from '@/components/CustomerSearch';
+import PricingSelector from '@/components/PricingSelector';
+import ItemPricingInput from '@/components/ItemPricingInput';
+import KgPricingInput from '@/components/KgPricingInput';
 
 interface OrderDetailsDialogProps {
   open: boolean;
@@ -20,96 +22,172 @@ interface OrderDetailsDialogProps {
   order: Order;
 }
 
-interface NewItem {
-  id: string;
-  item_name: string;
-  quantity: number;
-  price_per_item: number;
-  total_price: number;
-  payment_pending: boolean;
-  isNew: boolean;
-}
-
-interface ExistingItem {
-  id: string;
-  item_name: string;
-  quantity: number;
-  price_per_item: number;
-  total_price: number;
-  payment_pending: boolean;
-  isFromDB: boolean;
-  isUpdated: boolean;
-}
-
-type CombinedItem = NewItem | ExistingItem;
-
 const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogProps) => {
-  const [editedOrder, setEditedOrder] = useState<Order>(order);
-  const [activeTab, setActiveTab] = useState<'details' | 'items' | 'payments'>('details');
-  const [newItems, setNewItems] = useState<NewItem[]>([]);
-  
+  const { data: orderItems = [], isLoading } = useOrderItems(order.id);
+  const updatePayment = useUpdateOrderItemPayment();
+  const updateOrder = useUpdateOrder();
   const { toast } = useToast();
-  const updateOrderMutation = useUpdateOrder();
-  const updateStatusMutation = useUpdateOrderStatus();
-  const updatePaymentMutation = useUpdateOrderItemPayment();
-  const createOrderItemsMutation = useCreateOrderItems();
   
-  const { data: orderItems = [] } = useOrderItems(order.id);
-  const { data: laundryItems = [] } = useLaundryItems();
-  const { data: serviceTypes = [] } = useServiceTypes();
+  // Form state - exactly like create order
+  const [formData, setFormData] = useState<{
+    customer_id?: string;
+    customer_name: string;
+    customer_phone: string;
+    items: string;
+    items_detail: Record<string, OrderItem>;
+    priority: Order['priority'];
+    amount: number;
+    due_date: string;
+    pricing_type: 'item' | 'kg';
+    service_type_id?: string;
+    total_weight?: number;
+    subtotal: number;
+    discount: number;
+    discount_type: 'percentage' | 'fixed';
+    status: Order['status'];
+  }>({
+    customer_id: order.customer_id,
+    customer_name: order.customer_name,
+    customer_phone: order.customer_phone || '',
+    items: order.items,
+    items_detail: order.items_detail || {},
+    priority: order.priority,
+    amount: order.amount,
+    due_date: new Date(order.due_date).toISOString().split('T')[0],
+    pricing_type: order.pricing_type,
+    service_type_id: order.service_type_id,
+    total_weight: order.total_weight || 0,
+    subtotal: order.subtotal || order.amount,
+    discount: order.discount || 0,
+    discount_type: order.discount_type || 'percentage',
+    status: order.status
+  });
 
-  useEffect(() => {
-    setEditedOrder(order);
-    setNewItems([]);
-  }, [order]);
+  console.log('OrderDetailsDialog rendered for order:', order.id);
+  console.log('Order items from DB:', orderItems);
+  console.log('Form items_detail:', formData.items_detail);
 
-  const handleSave = async () => {
-    try {
-      // Update basic order details first
-      await updateOrderMutation.mutateAsync({
-        id: editedOrder.id,
-        customer_name: editedOrder.customer_name,
-        customer_phone: editedOrder.customer_phone,
-        items: editedOrder.items,
-        status: editedOrder.status,
-        priority: editedOrder.priority,
-        amount: editedOrder.amount,
-        due_date: editedOrder.due_date,
-        total_weight: editedOrder.total_weight,
-        service_type_id: editedOrder.service_type_id,
-        pricing_type: editedOrder.pricing_type,
-        items_detail: editedOrder.items_detail,
-        subtotal: editedOrder.subtotal,
-        discount: editedOrder.discount,
-        discount_type: editedOrder.discount_type,
+  const handleCustomerSelect = (customerId: string, customerName: string, customerPhone?: string) => {
+    setFormData(prev => ({
+      ...prev,
+      customer_id: customerId,
+      customer_name: customerName,
+      customer_phone: customerPhone || ''
+    }));
+  };
+
+  const handleItemsChange = (items: Record<string, OrderItem>) => {
+    const itemsString = Object.values(items)
+      .map(item => `${item.name} (${item.quantity})`)
+      .join(', ');
+    
+    setFormData(prev => ({
+      ...prev,
+      items: itemsString,
+      items_detail: items
+    }));
+  };
+
+  const handleAmountCalculated = (amount: number) => {
+    setFormData(prev => ({
+      ...prev,
+      subtotal: amount,
+      amount: calculateFinalAmount(amount, prev.discount, prev.discount_type)
+    }));
+  };
+
+  const calculateFinalAmount = (subtotal: number, discount: number, discountType: 'percentage' | 'fixed') => {
+    if (discountType === 'percentage') {
+      return subtotal - (subtotal * discount / 100);
+    } else {
+      return Math.max(0, subtotal - discount);
+    }
+  };
+
+  const handleDiscountChange = (discount: number) => {
+    setFormData(prev => ({
+      ...prev,
+      discount,
+      amount: calculateFinalAmount(prev.subtotal, discount, prev.discount_type)
+    }));
+  };
+
+  const handleDiscountTypeChange = (discountType: 'percentage' | 'fixed') => {
+    setFormData(prev => ({
+      ...prev,
+      discount_type: discountType,
+      amount: calculateFinalAmount(prev.subtotal, prev.discount, discountType)
+    }));
+  };
+
+  const handlePricingTypeChange = (pricingType: 'item' | 'kg') => {
+    setFormData(prev => ({
+      ...prev,
+      pricing_type: pricingType,
+      items: pricingType === 'kg' ? `Weight-based service: ${prev.total_weight}kg` : '',
+      items_detail: pricingType === 'item' ? prev.items_detail : {},
+      service_type_id: pricingType === 'kg' ? prev.service_type_id : undefined,
+      total_weight: pricingType === 'kg' ? prev.total_weight : 0,
+      subtotal: 0,
+      amount: 0,
+      discount: 0
+    }));
+  };
+
+  const handleSubmit = async () => {
+    if (!formData.customer_name || !formData.due_date || formData.amount <= 0) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive"
       });
+      return;
+    }
 
-      // Create new items in the order_items table if any
-      if (newItems.length > 0) {
-        const itemsToCreate = newItems
-          .filter(item => item.item_name && item.quantity > 0) // Only create valid items
-          .map(item => ({
-            order_id: editedOrder.id,
-            item_name: item.item_name,
-            quantity: item.quantity,
-            price_per_item: item.price_per_item,
-            total_price: item.total_price,
-            payment_pending: item.payment_pending,
-          }));
+    if (formData.pricing_type === 'item' && Object.keys(formData.items_detail).length === 0) {
+      toast({
+        title: "Error",
+        description: "Please add at least one item",
+        variant: "destructive"
+      });
+      return;
+    }
 
-        if (itemsToCreate.length > 0) {
-          await createOrderItemsMutation.mutateAsync(itemsToCreate);
-        }
-      }
+    if (formData.pricing_type === 'kg' && (!formData.service_type_id || !formData.total_weight)) {
+      toast({
+        title: "Error",
+        description: "Please select service type and enter weight",
+        variant: "destructive"
+      });
+      return;
+    }
 
+    try {
+      await updateOrder.mutateAsync({
+        id: order.id,
+        customer_id: formData.customer_id,
+        customer_name: formData.customer_name,
+        customer_phone: formData.customer_phone,
+        items: formData.items,
+        items_detail: formData.items_detail,
+        status: formData.status,
+        priority: formData.priority,
+        amount: formData.amount,
+        due_date: new Date(formData.due_date).toISOString(),
+        pricing_type: formData.pricing_type,
+        service_type_id: formData.service_type_id,
+        total_weight: formData.total_weight,
+        subtotal: formData.subtotal,
+        discount: formData.discount,
+        discount_type: formData.discount_type
+      });
+      
       toast({
         title: "Success",
         description: "Order updated successfully"
       });
-      
       onOpenChange(false);
     } catch (error) {
-      console.error('Error updating order:', error);
       toast({
         title: "Error",
         description: "Failed to update order",
@@ -118,505 +196,380 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
     }
   };
 
-  const addNewItem = () => {
-    const newItem: NewItem = {
-      id: `temp-${Date.now()}`,
-      item_name: '',
-      quantity: 1,
-      price_per_item: 0,
-      total_price: 0,
-      payment_pending: true,
-      isNew: true
-    };
-    setNewItems([...newItems, newItem]);
-  };
-
-  const updateNewItem = (index: number, field: keyof NewItem, value: any) => {
-    const updated = [...newItems];
-    updated[index] = { ...updated[index], [field]: value };
-    
-    if (field === 'quantity' || field === 'price_per_item') {
-      updated[index].total_price = updated[index].quantity * updated[index].price_per_item;
-    }
-    
-    setNewItems(updated);
-  };
-
-  const removeNewItem = (index: number) => {
-    setNewItems(newItems.filter((_, i) => i !== index));
-  };
-
-  const handlePaymentToggle = async (itemId: string, currentStatus: boolean) => {
+  const handlePaymentStatusChange = async (itemId: string, paymentPending: boolean) => {
     try {
-      await updatePaymentMutation.mutateAsync({
-        id: itemId,
-        payment_pending: !currentStatus
-      });
-      
+      await updatePayment.mutateAsync({ id: itemId, payment_pending: paymentPending });
       toast({
         title: "Success",
-        description: `Payment status updated`
+        description: `Payment status updated successfully`,
+      });
+    } catch (error) {
+      console.error('Payment update error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update payment status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMarkAllAsPaid = async () => {
+    try {
+      for (const item of orderItems) {
+        if (item.payment_pending) {
+          await updatePayment.mutateAsync({ id: item.id, payment_pending: false });
+        }
+      }
+      toast({
+        title: "Success",
+        description: "All items marked as paid",
       });
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to update payment status",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
 
-  // Combine existing order items with new items for payment management
-  const combinedItems: CombinedItem[] = [
-    ...orderItems.map(item => ({
+  const handleMarkAllAsPending = async () => {
+    try {
+      for (const item of orderItems) {
+        if (!item.payment_pending) {
+          await updatePayment.mutateAsync({ id: item.id, payment_pending: true });
+        }
+      }
+      toast({
+        title: "Success",
+        description: "All items marked as payment pending",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update payment status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Create a combined view of existing order items and form items
+  const getCombinedItems = () => {
+    const existingItems = orderItems.map(item => ({
       id: item.id,
       item_name: item.item_name,
       quantity: item.quantity,
       price_per_item: item.price_per_item,
       total_price: item.total_price,
       payment_pending: item.payment_pending,
-      isFromDB: true,
-      isUpdated: false
-    } as ExistingItem)),
-    ...newItems.map(item => ({
-      id: item.id,
-      item_name: item.item_name,
-      quantity: item.quantity,
-      price_per_item: item.price_per_item,
-      total_price: item.total_price,
-      payment_pending: item.payment_pending,
-      isNew: true
-    } as NewItem))
-  ];
+      isFromDB: true
+    }));
 
-  const totalPendingAmount = combinedItems
-    .filter(item => item.payment_pending)
-    .reduce((sum, item) => sum + item.total_price, 0);
+    const formItems = Object.entries(formData.items_detail).map(([itemId, item]) => {
+      // Check if this item already exists in DB items
+      const existingItem = existingItems.find(dbItem => dbItem.item_name === item.name);
+      if (existingItem) {
+        // Update the existing item with new quantity and price
+        return {
+          ...existingItem,
+          quantity: item.quantity,
+          price_per_item: item.price || 0,
+          total_price: item.quantity * (item.price || 0),
+          isUpdated: true
+        };
+      } else {
+        // This is a new item
+        return {
+          id: itemId,
+          item_name: item.name,
+          quantity: item.quantity,
+          price_per_item: item.price || 0,
+          total_price: item.quantity * (item.price || 0),
+          payment_pending: true, // New items default to payment pending
+          isFromDB: false,
+          isNew: true
+        };
+      }
+    });
 
+    // Remove duplicates and combine
+    const combinedItems = [...formItems];
+    
+    // Add existing items that are not in form items
+    existingItems.forEach(existingItem => {
+      const isInFormItems = formItems.some(formItem => formItem.item_name === existingItem.item_name);
+      if (!isInFormItems) {
+        combinedItems.push(existingItem);
+      }
+    });
+
+    return combinedItems;
+  };
+
+  const combinedItems = getCombinedItems();
+  const paidItemsCount = combinedItems.filter(item => !item.payment_pending).length;
+  const totalItemsCount = combinedItems.length;
   const totalPaidAmount = combinedItems
     .filter(item => !item.payment_pending)
     .reduce((sum, item) => sum + item.total_price, 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Edit Order - {order.order_number}
+            <Edit className="h-5 w-5" />
+            Edit Order #{order.order_number}
           </DialogTitle>
+          <DialogDescription>
+            Update the details for this laundry order.
+          </DialogDescription>
         </DialogHeader>
-
-        {/* Tab Navigation */}
-        <div className="flex border-b border-gray-200 mb-6">
-          <button
-            className={`px-4 py-2 font-medium text-sm ${
-              activeTab === 'details' 
-                ? 'border-b-2 border-blue-500 text-blue-600' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-            onClick={() => setActiveTab('details')}
-          >
-            Order Details
-          </button>
-          {editedOrder.pricing_type === 'item' && (
-            <>
-              <button
-                className={`px-4 py-2 font-medium text-sm ${
-                  activeTab === 'items' 
-                    ? 'border-b-2 border-blue-500 text-blue-600' 
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-                onClick={() => setActiveTab('items')}
-              >
-                Manage Items
-              </button>
-              <button
-                className={`px-4 py-2 font-medium text-sm ${
-                  activeTab === 'payments' 
-                    ? 'border-b-2 border-blue-500 text-blue-600' 
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-                onClick={() => setActiveTab('payments')}
-              >
-                Payment Management
-              </button>
-            </>
+        
+        <div className="grid gap-6 py-4">
+          {/* Customer Search - exactly like create order */}
+          <CustomerSearch
+            value={formData.customer_id}
+            onSelect={handleCustomerSelect}
+            onNewCustomer={(name, phone) => {
+              setFormData(prev => ({
+                ...prev,
+                customer_name: name,
+                customer_phone: phone
+              }));
+            }}
+          />
+          
+          {/* Pricing Type Selector - exactly like create order */}
+          <PricingSelector
+            value={formData.pricing_type}
+            onChange={handlePricingTypeChange}
+          />
+          
+          {/* Pricing Input - exactly like create order */}
+          {formData.pricing_type === 'item' ? (
+            <ItemPricingInput
+              items={formData.items_detail}
+              onChange={handleItemsChange}
+              onAmountCalculated={handleAmountCalculated}
+            />
+          ) : (
+            <KgPricingInput
+              serviceTypeId={formData.service_type_id || ''}
+              weight={formData.total_weight || 0}
+              onServiceTypeChange={(serviceTypeId) => setFormData(prev => ({ ...prev, service_type_id: serviceTypeId }))}
+              onWeightChange={(weight) => setFormData(prev => ({ ...prev, total_weight: weight }))}
+              onAmountCalculated={handleAmountCalculated}
+            />
           )}
-        </div>
-
-        {/* Tab Content */}
-        {activeTab === 'details' && (
-          <div className="space-y-6">
-            {/* Basic Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Basic Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="customer_name">Customer Name</Label>
-                    <Input
-                      id="customer_name"
-                      value={editedOrder.customer_name}
-                      onChange={(e) => setEditedOrder({...editedOrder, customer_name: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="customer_phone">Customer Phone</Label>
-                    <Input
-                      id="customer_phone"
-                      value={editedOrder.customer_phone || ''}
-                      onChange={(e) => setEditedOrder({...editedOrder, customer_phone: e.target.value})}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="items">Items Description</Label>
-                  <Textarea
-                    id="items"
-                    value={editedOrder.items}
-                    onChange={(e) => setEditedOrder({...editedOrder, items: e.target.value})}
-                    rows={3}
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="status">Status</Label>
-                    <Select value={editedOrder.status} onValueChange={(value) => setEditedOrder({...editedOrder, status: value as Order['status']})}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="received">Received</SelectItem>
-                        <SelectItem value="processing">Processing</SelectItem>
-                        <SelectItem value="ready">Ready</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="delayed">Delayed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="priority">Priority</Label>
-                    <Select value={editedOrder.priority} onValueChange={(value) => setEditedOrder({...editedOrder, priority: value as Order['priority']})}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="normal">Normal</SelectItem>
-                        <SelectItem value="urgent">Urgent</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="amount">Total Amount (₹)</Label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      step="0.01"
-                      value={editedOrder.amount}
-                      onChange={(e) => setEditedOrder({...editedOrder, amount: parseFloat(e.target.value) || 0})}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="due_date">Due Date</Label>
-                  <Input
-                    id="due_date"
-                    type="datetime-local"
-                    value={editedOrder.due_date ? new Date(editedOrder.due_date).toISOString().slice(0, 16) : ''}
-                    onChange={(e) => setEditedOrder({...editedOrder, due_date: e.target.value})}
-                  />
-                </div>
-
-                {editedOrder.pricing_type === 'kg' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="total_weight">Total Weight (kg)</Label>
-                      <Input
-                        id="total_weight"
-                        type="number"
-                        step="0.1"
-                        value={editedOrder.total_weight || ''}
-                        onChange={(e) => setEditedOrder({...editedOrder, total_weight: parseFloat(e.target.value) || undefined})}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="service_type">Service Type</Label>
-                      <Select 
-                        value={editedOrder.service_type_id || ''} 
-                        onValueChange={(value) => setEditedOrder({...editedOrder, service_type_id: value || undefined})}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select service type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {serviceTypes.map((serviceType) => (
-                            <SelectItem key={serviceType.id} value={serviceType.id}>
-                              {serviceType.name} (₹{serviceType.price_per_kg}/kg)
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Pricing Details */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Pricing Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="subtotal">Subtotal (₹)</Label>
-                    <Input
-                      id="subtotal"
-                      type="number"
-                      step="0.01"
-                      value={editedOrder.subtotal || ''}
-                      onChange={(e) => setEditedOrder({...editedOrder, subtotal: parseFloat(e.target.value) || undefined})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="discount">Discount</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="discount"
-                        type="number"
-                        step="0.01"
-                        value={editedOrder.discount || ''}
-                        onChange={(e) => setEditedOrder({...editedOrder, discount: parseFloat(e.target.value) || undefined})}
-                      />
-                      <Select 
-                        value={editedOrder.discount_type || 'percentage'} 
-                        onValueChange={(value) => setEditedOrder({...editedOrder, discount_type: value as 'percentage' | 'fixed'})}
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="percentage">%</SelectItem>
-                          <SelectItem value="fixed">₹</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          
+          {/* Discount Section - exactly like create order */}
+          <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
+            <div className="flex items-center gap-2">
+              <Percent className="h-4 w-4 text-gray-600" />
+              <Label className="text-sm font-medium">Discount</Label>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="discountType">Type</Label>
+                <Select value={formData.discount_type} onValueChange={handleDiscountTypeChange}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentage">Percentage (%)</SelectItem>
+                    <SelectItem value="fixed">Fixed Amount (₹)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="discount">Discount</Label>
+                <Input
+                  id="discount"
+                  type="number"
+                  placeholder="0"
+                  min="0"
+                  step={formData.discount_type === 'percentage' ? "1" : "0.01"}
+                  max={formData.discount_type === 'percentage' ? "100" : undefined}
+                  value={formData.discount || ''}
+                  onChange={(e) => handleDiscountChange(Number(e.target.value))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="subtotal">Subtotal (₹)</Label>
+                <Input 
+                  id="subtotal" 
+                  type="number" 
+                  value={formData.subtotal || ''}
+                  readOnly
+                  className="bg-gray-100"
+                />
+              </div>
+            </div>
           </div>
-        )}
+          
+          {/* Status, Priority, Amount - exactly like create order */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select value={formData.status} onValueChange={(value: Order['status']) => setFormData(prev => ({ ...prev, status: value }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="received">Received</SelectItem>
+                  <SelectItem value="processing">Processing</SelectItem>
+                  <SelectItem value="ready">Ready</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="delayed">Delayed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="priority">Priority</Label>
+              <Select value={formData.priority} onValueChange={(value: Order['priority']) => setFormData(prev => ({ ...prev, priority: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="amount">Final Amount (₹)</Label>
+              <Input 
+                id="amount" 
+                type="number" 
+                placeholder="0.00" 
+                step="0.01"
+                value={formData.amount || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, amount: Number(e.target.value) }))}
+              />
+            </div>
+          </div>
+          
+          {/* Due Date - exactly like create order */}
+          <div className="space-y-2">
+            <Label htmlFor="dueDate">Due Date</Label>
+            <Input 
+              id="dueDate" 
+              type="date"
+              value={formData.due_date}
+              onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
+            />
+          </div>
 
-        {activeTab === 'items' && editedOrder.pricing_type === 'item' && (
-          <div className="space-y-6">
+          {/* Payment Management Section - UPDATED to show combined items */}
+          {formData.pricing_type === 'item' && combinedItems.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Add New Items</span>
-                  <Button onClick={addNewItem} size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Item
-                  </Button>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Payment Management
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {newItems.map((item, index) => (
-                    <div key={item.id} className="grid grid-cols-5 gap-4 items-end p-4 border rounded-lg">
-                      <div>
-                        <Label>Item Name</Label>
-                        <Select 
-                          value={item.item_name} 
-                          onValueChange={(value) => {
-                            const selectedItem = laundryItems.find(li => li.name === value);
-                            updateNewItem(index, 'item_name', value);
-                            if (selectedItem) {
-                              updateNewItem(index, 'price_per_item', selectedItem.price_per_item || 0);
-                            }
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select item" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {laundryItems.map((laundryItem) => (
-                              <SelectItem key={laundryItem.id} value={laundryItem.name}>
-                                {laundryItem.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label>Quantity</Label>
-                        <Input
-                          type="number"
-                          value={item.quantity}
-                          onChange={(e) => updateNewItem(index, 'quantity', parseInt(e.target.value) || 0)}
-                        />
-                      </div>
-                      <div>
-                        <Label>Price per Item (₹)</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={item.price_per_item}
-                          onChange={(e) => updateNewItem(index, 'price_per_item', parseFloat(e.target.value) || 0)}
-                        />
-                      </div>
-                      <div>
-                        <Label>Total (₹)</Label>
-                        <Input
-                          type="number"
-                          value={item.total_price.toFixed(2)}
-                          disabled
-                        />
-                      </div>
-                      <Button 
-                        variant="destructive" 
-                        size="sm" 
-                        onClick={() => removeNewItem(index)}
+                  {/* Payment Summary */}
+                  <div className="grid grid-cols-3 gap-4 text-sm bg-gray-50 p-3 rounded">
+                    <div>
+                      <p className="text-gray-600">Total Amount</p>
+                      <p className="font-bold text-lg">₹{formData.amount.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Paid Amount</p>
+                      <p className="font-medium text-green-600">₹{totalPaidAmount.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Payment Status</p>
+                      <p className="font-medium">{paidItemsCount}/{totalItemsCount} items paid</p>
+                    </div>
+                  </div>
+
+                  {/* Bulk Actions - only for existing DB items */}
+                  {orderItems.length > 0 && (
+                    <div className="flex gap-2 pb-3 border-b">
+                      <Button
+                        onClick={handleMarkAllAsPaid}
+                        size="sm"
+                        variant="outline"
+                        disabled={updatePayment.isPending}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        Mark All as Paid
+                      </Button>
+                      <Button
+                        onClick={handleMarkAllAsPending}
+                        size="sm"
+                        variant="outline"
+                        disabled={updatePayment.isPending}
+                      >
+                        Mark All as Pending
                       </Button>
                     </div>
-                  ))}
-                  
-                  {newItems.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      <Package className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                      <p>No new items added yet</p>
-                      <p className="text-sm">Click "Add Item" to start adding items</p>
-                    </div>
                   )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
 
-        {activeTab === 'payments' && editedOrder.pricing_type === 'item' && (
-          <div className="space-y-6">
-            {/* Payment Summary */}
-            <div className="grid grid-cols-3 gap-4">
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Total Amount</p>
-                      <p className="text-2xl font-bold">₹{(totalPendingAmount + totalPaidAmount).toFixed(2)}</p>
-                    </div>
-                    <CreditCard className="h-8 w-8 text-blue-500" />
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Paid Amount</p>
-                      <p className="text-2xl font-bold text-green-600">₹{totalPaidAmount.toFixed(2)}</p>
-                    </div>
-                    <CheckCircle className="h-8 w-8 text-green-500" />
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Pending Amount</p>
-                      <p className="text-2xl font-bold text-red-600">₹{totalPendingAmount.toFixed(2)}</p>
-                    </div>
-                    <XCircle className="h-8 w-8 text-red-500" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Items Payment Management */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Items Payment Status</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {combinedItems.length > 0 ? (
-                    combinedItems.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  {/* Individual Items - Combined view */}
+                  <div className="space-y-3">
+                    {combinedItems.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-medium">{item.item_name}</h4>
-                            {'isNew' in item && item.isNew && (
-                              <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                                New Item
-                              </Badge>
-                            )}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-medium">{item.item_name}</h4>
+                              {item.isNew && (
+                                <Badge variant="secondary" className="bg-blue-100 text-blue-800">New</Badge>
+                              )}
+                              {item.isUpdated && (
+                                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Updated</Badge>
+                              )}
+                            </div>
+                            <Badge variant={item.payment_pending ? "destructive" : "default"}>
+                              {item.payment_pending ? "Payment Pending" : "Paid"}
+                            </Badge>
                           </div>
-                          <p className="text-sm text-gray-600">
-                            Quantity: {item.quantity} × ₹{item.price_per_item.toFixed(2)} = ₹{item.total_price.toFixed(2)}
-                          </p>
+                          <div className="text-sm text-gray-600 mt-1">
+                            <span>Qty: {item.quantity}</span>
+                            <span className="mx-2">•</span>
+                            <span>Price: ₹{item.price_per_item.toFixed(2)}</span>
+                            <span className="mx-2">•</span>
+                            <span>Total: ₹{item.total_price.toFixed(2)}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <Badge 
-                            className={item.payment_pending 
-                              ? 'bg-red-100 text-red-800' 
-                              : 'bg-green-100 text-green-800'
-                            }
-                          >
-                            {item.payment_pending ? 'Pending' : 'Paid'}
-                          </Badge>
-                          {'isFromDB' in item && item.isFromDB && (
+                        <div className="ml-4">
+                          {item.isFromDB ? (
                             <Button
                               size="sm"
                               variant={item.payment_pending ? "default" : "outline"}
-                              onClick={() => handlePaymentToggle(item.id, item.payment_pending)}
+                              onClick={() => handlePaymentStatusChange(item.id, !item.payment_pending)}
+                              disabled={updatePayment.isPending}
                             >
-                              {item.payment_pending ? 'Mark as Paid' : 'Mark as Pending'}
+                              {item.payment_pending ? "Mark Paid" : "Mark Pending"}
                             </Button>
-                          )}
-                          {'isNew' in item && item.isNew && (
-                            <Badge variant="secondary">
-                              Will be created on save
+                          ) : (
+                            <Badge variant="outline" className="bg-gray-100 text-gray-600">
+                              New Item - Save to manage payment
                             </Badge>
                           )}
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <CreditCard className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                      <p>No items found</p>
-                      <p className="text-sm">Add items in the "Manage Items" tab to see payment options</p>
-                    </div>
-                  )}
+                    ))}
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          </div>
-        )}
-
-        <Separator />
-
-        {/* Action Buttons */}
-        <div className="flex justify-end gap-3">
+          )}
+        </div>
+        
+        {/* Footer Buttons - exactly like create order */}
+        <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={updateOrderMutation.isPending}>
-            <Save className="h-4 w-4 mr-2" />
-            {updateOrderMutation.isPending ? 'Saving...' : 'Save Changes'}
+          <Button onClick={handleSubmit} disabled={updateOrder.isPending}>
+            {updateOrder.isPending ? 'Updating...' : 'Update Order'}
           </Button>
         </div>
       </DialogContent>

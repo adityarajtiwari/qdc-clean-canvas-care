@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useOrders } from '@/hooks/useOrders';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Plus, Filter, Calendar, User, DollarSign, Package, AlertCircle, Clock, CheckCircle2, Truck } from 'lucide-react';
-import { useOrders, Order } from '@/hooks/useOrders';
-import OrderDetailsDialog from './OrderDetailsDialog';
-import NewOrderDialog from './NewOrderDialog';
+import { Plus, Search, Filter, Package, Download } from 'lucide-react';
 import OrderActions from './OrderActions';
 import Pagination from './Pagination';
 import { useToast } from '@/hooks/use-toast';
@@ -19,65 +16,9 @@ const OrderManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [showNewOrderDialog, setShowNewOrderDialog] = useState(false);
-
-  const itemsPerPage = 10;
-  const { data: ordersData, isLoading, error } = useOrders(currentPage, itemsPerPage, searchTerm, statusFilter, paymentFilter);
-
-  const orders = ordersData?.orders || [];
-  const totalPages = ordersData?.totalPages || 1;
-  const totalCount = ordersData?.totalCount || 0;
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'received': return 'bg-blue-100 text-blue-800';
-      case 'processing': return 'bg-yellow-100 text-yellow-800';
-      case 'ready': return 'bg-green-100 text-green-800';
-      case 'completed': return 'bg-gray-100 text-gray-800';
-      case 'delayed': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'urgent': return 'bg-red-100 text-red-800';
-      case 'normal': return 'bg-blue-100 text-blue-800';
-      case 'low': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getPaymentStatusColor = (order: any) => {
-    if (order.pricing_type === 'kg') {
-      return 'bg-green-100 text-green-800'; // KG orders are always considered paid
-    }
-    
-    if (order.has_pending_payments) {
-      return 'bg-red-100 text-red-800';
-    }
-    
-    return 'bg-green-100 text-green-800';
-  };
-
-  const getPaymentStatusText = (order: any) => {
-    if (order.pricing_type === 'kg') {
-      return 'Paid';
-    }
-    
-    if (order.has_pending_payments) {
-      return 'Pending';
-    }
-    
-    return 'Paid';
-  };
-
-  const handleEdit = (order: Order) => {
-    setSelectedOrder(order);
-    setShowEditDialog(true);
-  };
+  
+  const { data, isLoading, error } = useOrders(currentPage, 10, searchTerm, statusFilter, paymentFilter);
+  const { toast } = useToast();
 
   const generateInvoice = (order: any) => {
     const doc = new jsPDF();
@@ -176,6 +117,50 @@ const OrderManagement = () => {
     });
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'received': return 'bg-blue-100 text-blue-800';
+      case 'processing': return 'bg-yellow-100 text-yellow-800';
+      case 'ready': return 'bg-green-100 text-green-800';
+      case 'completed': return 'bg-gray-100 text-gray-800';
+      case 'delayed': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'urgent': return 'bg-red-100 text-red-800';
+      case 'normal': return 'bg-blue-100 text-blue-800';
+      case 'low': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getPaymentStatusColor = (order: any) => {
+    if (order.pricing_type === 'kg') {
+      return 'bg-green-100 text-green-800'; // KG orders are always considered paid
+    }
+    
+    if (order.has_pending_payments) {
+      return 'bg-red-100 text-red-800';
+    }
+    
+    return 'bg-green-100 text-green-800';
+  };
+
+  const getPaymentStatusText = (order: any) => {
+    if (order.pricing_type === 'kg') {
+      return 'Paid';
+    }
+    
+    if (order.has_pending_payments) {
+      return 'Pending';
+    }
+    
+    return 'Paid';
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -193,17 +178,10 @@ const OrderManagement = () => {
   }
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Order Management</h1>
-          <p className="text-gray-600">Manage all your laundry orders efficiently</p>
-        </div>
-        <Button 
-          onClick={() => setShowNewOrderDialog(true)}
-          className="flex items-center gap-2"
-        >
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Order Management</h1>
+        <Button className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
           New Order
         </Button>
@@ -255,16 +233,16 @@ const OrderManagement = () => {
         </CardContent>
       </Card>
 
-      {/* Orders List */}
+      {/* Orders Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            Orders ({totalCount})
+            Orders ({data?.totalCount || 0})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {orders.length > 0 ? (
+          {data?.orders && data.orders.length > 0 ? (
             <>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
@@ -282,7 +260,7 @@ const OrderManagement = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.map((order) => (
+                    {data.orders.map((order) => (
                       <tr key={order.id} className="border-b hover:bg-gray-50">
                         <td className="p-3 font-mono text-sm">{order.order_number}</td>
                         <td className="p-3">
@@ -335,11 +313,11 @@ const OrderManagement = () => {
                 </table>
               </div>
               
-              {totalPages > 1 && (
+              {data.totalPages > 1 && (
                 <div className="mt-6">
                   <Pagination
                     currentPage={currentPage}
-                    totalPages={totalPages}
+                    totalPages={data.totalPages}
                     onPageChange={setCurrentPage}
                   />
                 </div>
@@ -362,21 +340,6 @@ const OrderManagement = () => {
           )}
         </CardContent>
       </Card>
-
-      {/* Order Details Dialog */}
-      {selectedOrder && (
-        <OrderDetailsDialog
-          open={showEditDialog}
-          onOpenChange={setShowEditDialog}
-          order={selectedOrder}
-        />
-      )}
-
-      {/* New Order Dialog */}
-      <NewOrderDialog
-        open={showNewOrderDialog}
-        onOpenChange={setShowNewOrderDialog}
-      />
     </div>
   );
 };
