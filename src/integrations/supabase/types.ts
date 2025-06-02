@@ -89,10 +89,12 @@ export type Database = {
           created_at: string
           id: string
           item_name: string
+          notes: string | null
           order_id: string
           payment_pending: boolean
           price_per_item: number
           quantity: number
+          tags: string[] | null
           total_price: number
           updated_at: string
         }
@@ -100,10 +102,12 @@ export type Database = {
           created_at?: string
           id?: string
           item_name: string
+          notes?: string | null
           order_id: string
           payment_pending?: boolean
           price_per_item?: number
           quantity?: number
+          tags?: string[] | null
           total_price?: number
           updated_at?: string
         }
@@ -111,10 +115,12 @@ export type Database = {
           created_at?: string
           id?: string
           item_name?: string
+          notes?: string | null
           order_id?: string
           payment_pending?: boolean
           price_per_item?: number
           quantity?: number
+          tags?: string[] | null
           total_price?: number
           updated_at?: string
         }

@@ -10,6 +10,8 @@ export interface OrderItem {
   price_per_item: number;
   total_price: number;
   payment_pending: boolean;
+  notes?: string;
+  tags?: string[];
   created_at: string;
   updated_at: string;
 }

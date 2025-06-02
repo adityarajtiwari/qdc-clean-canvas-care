@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Plus, Percent } from 'lucide-react';
 import CustomerSearch from '@/components/CustomerSearch';
 import PricingSelector from '@/components/PricingSelector';
-import ItemPricingInput from '@/components/ItemPricingInput';
+import ItemQuantityInputWithNotes from '@/components/ItemQuantityInputWithNotes';
+import WeightBasedItemList from '@/components/WeightBasedItemList';
 import KgPricingInput from '@/components/KgPricingInput';
 
 interface NewOrderDialogProps {
@@ -17,17 +19,24 @@ interface NewOrderDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface WeightBasedItem {
+  name: string;
+  notes?: string;
+  tags?: string[];
+}
+
 const NewOrderDialog = ({ open, onOpenChange }: NewOrderDialogProps) => {
   const createOrder = useCreateOrder();
   const { toast } = useToast();
   
-  // Form state - exactly like OrderDetailsDialog
+  // Form state - enhanced with notes and tags support
   const [formData, setFormData] = useState<{
     customer_id?: string;
     customer_name: string;
     customer_phone: string;
     items: string;
     items_detail: Record<string, OrderItem>;
+    weight_based_items: WeightBasedItem[];
     priority: Order['priority'];
     amount: number;
     due_date: string;
@@ -42,6 +51,7 @@ const NewOrderDialog = ({ open, onOpenChange }: NewOrderDialogProps) => {
     customer_phone: '',
     items: '',
     items_detail: {},
+    weight_based_items: [],
     priority: 'normal',
     amount: 0,
     due_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 3 days from now
@@ -70,6 +80,16 @@ const NewOrderDialog = ({ open, onOpenChange }: NewOrderDialogProps) => {
       ...prev,
       items: itemsString,
       items_detail: items
+    }));
+  };
+
+  const handleWeightBasedItemsChange = (items: WeightBasedItem[]) => {
+    const itemsString = items.map(item => item.name).join(', ');
+    
+    setFormData(prev => ({
+      ...prev,
+      weight_based_items: items,
+      items: itemsString || `Weight-based service: ${prev.total_weight}kg`
     }));
   };
 
@@ -111,6 +131,7 @@ const NewOrderDialog = ({ open, onOpenChange }: NewOrderDialogProps) => {
       pricing_type: pricingType,
       items: pricingType === 'kg' ? `Weight-based service: ${prev.total_weight}kg` : '',
       items_detail: pricingType === 'item' ? prev.items_detail : {},
+      weight_based_items: pricingType === 'kg' ? prev.weight_based_items : [],
       service_type_id: pricingType === 'kg' ? prev.service_type_id : undefined,
       total_weight: pricingType === 'kg' ? prev.total_weight : 0,
       subtotal: 0,
@@ -125,6 +146,7 @@ const NewOrderDialog = ({ open, onOpenChange }: NewOrderDialogProps) => {
       customer_phone: '',
       items: '',
       items_detail: {},
+      weight_based_items: [],
       priority: 'normal',
       amount: 0,
       due_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -165,12 +187,26 @@ const NewOrderDialog = ({ open, onOpenChange }: NewOrderDialogProps) => {
     }
 
     try {
+      // Prepare items_detail for kg pricing with weight-based items
+      let finalItemsDetail = formData.items_detail;
+      if (formData.pricing_type === 'kg' && formData.weight_based_items.length > 0) {
+        finalItemsDetail = formData.weight_based_items.reduce((acc, item, index) => {
+          acc[`${item.name}_${index}`] = {
+            name: item.name,
+            quantity: 1,
+            notes: item.notes,
+            tags: item.tags
+          };
+          return acc;
+        }, {} as Record<string, OrderItem>);
+      }
+
       await createOrder.mutateAsync({
         customer_id: formData.customer_id,
         customer_name: formData.customer_name,
         customer_phone: formData.customer_phone,
         items: formData.items,
-        items_detail: formData.items_detail,
+        items_detail: finalItemsDetail,
         status: 'received',
         priority: formData.priority,
         amount: formData.amount,
@@ -235,19 +271,41 @@ const NewOrderDialog = ({ open, onOpenChange }: NewOrderDialogProps) => {
           
           {/* Pricing Input */}
           {formData.pricing_type === 'item' ? (
-            <ItemPricingInput
-              items={formData.items_detail}
-              onChange={handleItemsChange}
-              onAmountCalculated={handleAmountCalculated}
-            />
+            <div className="space-y-4">
+              <ItemQuantityInputWithNotes
+                items={formData.items_detail}
+                onChange={handleItemsChange}
+              />
+              {Object.keys(formData.items_detail).length > 0 && (
+                <div className="p-4 border rounded-lg bg-blue-50">
+                  <Label className="text-sm font-medium">Total Amount Calculation</Label>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Individual item pricing will be calculated based on predefined rates
+                  </p>
+                  <Input
+                    type="number"
+                    placeholder="Enter total amount"
+                    value={formData.subtotal || ''}
+                    onChange={(e) => handleAmountCalculated(Number(e.target.value))}
+                    className="mt-2"
+                  />
+                </div>
+              )}
+            </div>
           ) : (
-            <KgPricingInput
-              serviceTypeId={formData.service_type_id || ''}
-              weight={formData.total_weight || 0}
-              onServiceTypeChange={(serviceTypeId) => setFormData(prev => ({ ...prev, service_type_id: serviceTypeId }))}
-              onWeightChange={(weight) => setFormData(prev => ({ ...prev, total_weight: weight }))}
-              onAmountCalculated={handleAmountCalculated}
-            />
+            <div className="space-y-4">
+              <KgPricingInput
+                serviceTypeId={formData.service_type_id || ''}
+                weight={formData.total_weight || 0}
+                onServiceTypeChange={(serviceTypeId) => setFormData(prev => ({ ...prev, service_type_id: serviceTypeId }))}
+                onWeightChange={(weight) => setFormData(prev => ({ ...prev, total_weight: weight }))}
+                onAmountCalculated={handleAmountCalculated}
+              />
+              <WeightBasedItemList
+                items={formData.weight_based_items}
+                onChange={handleWeightBasedItemsChange}
+              />
+            </div>
           )}
           
           {/* Discount Section */}
