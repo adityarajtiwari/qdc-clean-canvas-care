@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Search, Filter, Package, Download } from 'lucide-react';
 import OrderActions from './OrderActions';
 import Pagination from './Pagination';
+import NewOrderDialog from './NewOrderDialog';
 import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 
@@ -345,22 +346,11 @@ const OrderManagement = () => {
         </CardContent>
       </Card>
 
-      {/* Temporary simple new order dialog */}
-      {showNewOrderDialog && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h2 className="text-xl font-bold mb-4">New Order</h2>
-            <p className="text-gray-600 mb-4">
-              New order creation functionality is coming soon. For now, you can create orders through the existing interface.
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowNewOrderDialog(false)}>
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* New Order Dialog */}
+      <NewOrderDialog 
+        open={showNewOrderDialog} 
+        onOpenChange={setShowNewOrderDialog}
+      />
     </div>
   );
 };
