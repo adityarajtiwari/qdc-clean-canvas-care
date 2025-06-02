@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -29,7 +28,7 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
   const { toast } = useToast();
   
   // Form state - exactly like create order
-  const [editOrder, setEditOrder] = useState<{
+  const [formData, setFormData] = useState<{
     customer_id?: string;
     customer_name: string;
     customer_phone: string;
@@ -67,7 +66,7 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
   console.log('Order items:', orderItems);
 
   const handleCustomerSelect = (customerId: string, customerName: string, customerPhone?: string) => {
-    setEditOrder(prev => ({
+    setFormData(prev => ({
       ...prev,
       customer_id: customerId,
       customer_name: customerName,
@@ -80,7 +79,7 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
       .map(item => `${item.name} (${item.quantity})`)
       .join(', ');
     
-    setEditOrder(prev => ({
+    setFormData(prev => ({
       ...prev,
       items: itemsString,
       items_detail: items
@@ -88,7 +87,7 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
   };
 
   const handleAmountCalculated = (amount: number) => {
-    setEditOrder(prev => ({
+    setFormData(prev => ({
       ...prev,
       subtotal: amount,
       amount: calculateFinalAmount(amount, prev.discount, prev.discount_type)
@@ -104,7 +103,7 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
   };
 
   const handleDiscountChange = (discount: number) => {
-    setEditOrder(prev => ({
+    setFormData(prev => ({
       ...prev,
       discount,
       amount: calculateFinalAmount(prev.subtotal, discount, prev.discount_type)
@@ -112,7 +111,7 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
   };
 
   const handleDiscountTypeChange = (discountType: 'percentage' | 'fixed') => {
-    setEditOrder(prev => ({
+    setFormData(prev => ({
       ...prev,
       discount_type: discountType,
       amount: calculateFinalAmount(prev.subtotal, prev.discount, discountType)
@@ -120,7 +119,7 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
   };
 
   const handlePricingTypeChange = (pricingType: 'item' | 'kg') => {
-    setEditOrder(prev => ({
+    setFormData(prev => ({
       ...prev,
       pricing_type: pricingType,
       items: pricingType === 'kg' ? `Weight-based service: ${prev.total_weight}kg` : '',
@@ -133,8 +132,8 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
     }));
   };
 
-  const handleSave = async () => {
-    if (!editOrder.customer_name || !editOrder.due_date || editOrder.amount <= 0) {
+  const handleSubmit = async () => {
+    if (!formData.customer_name || !formData.due_date || formData.amount <= 0) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -143,7 +142,7 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
       return;
     }
 
-    if (editOrder.pricing_type === 'item' && Object.keys(editOrder.items_detail).length === 0) {
+    if (formData.pricing_type === 'item' && Object.keys(formData.items_detail).length === 0) {
       toast({
         title: "Error",
         description: "Please add at least one item",
@@ -152,7 +151,7 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
       return;
     }
 
-    if (editOrder.pricing_type === 'kg' && (!editOrder.service_type_id || !editOrder.total_weight)) {
+    if (formData.pricing_type === 'kg' && (!formData.service_type_id || !formData.total_weight)) {
       toast({
         title: "Error",
         description: "Please select service type and enter weight",
@@ -164,21 +163,21 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
     try {
       await updateOrder.mutateAsync({
         id: order.id,
-        customer_id: editOrder.customer_id,
-        customer_name: editOrder.customer_name,
-        customer_phone: editOrder.customer_phone,
-        items: editOrder.items,
-        items_detail: editOrder.items_detail,
-        status: editOrder.status,
-        priority: editOrder.priority,
-        amount: editOrder.amount,
-        due_date: new Date(editOrder.due_date).toISOString(),
-        pricing_type: editOrder.pricing_type,
-        service_type_id: editOrder.service_type_id,
-        total_weight: editOrder.total_weight,
-        subtotal: editOrder.subtotal,
-        discount: editOrder.discount,
-        discount_type: editOrder.discount_type
+        customer_id: formData.customer_id,
+        customer_name: formData.customer_name,
+        customer_phone: formData.customer_phone,
+        items: formData.items,
+        items_detail: formData.items_detail,
+        status: formData.status,
+        priority: formData.priority,
+        amount: formData.amount,
+        due_date: new Date(formData.due_date).toISOString(),
+        pricing_type: formData.pricing_type,
+        service_type_id: formData.service_type_id,
+        total_weight: formData.total_weight,
+        subtotal: formData.subtotal,
+        discount: formData.discount,
+        discount_type: formData.discount_type
       });
       
       toast({
@@ -272,11 +271,12 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
         </DialogHeader>
         
         <div className="grid gap-6 py-4">
+          {/* Customer Search - exactly like create order */}
           <CustomerSearch
-            value={editOrder.customer_id}
+            value={formData.customer_id}
             onSelect={handleCustomerSelect}
             onNewCustomer={(name, phone) => {
-              setEditOrder(prev => ({
+              setFormData(prev => ({
                 ...prev,
                 customer_name: name,
                 customer_phone: phone
@@ -284,28 +284,30 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
             }}
           />
           
+          {/* Pricing Type Selector - exactly like create order */}
           <PricingSelector
-            value={editOrder.pricing_type}
+            value={formData.pricing_type}
             onChange={handlePricingTypeChange}
           />
           
-          {editOrder.pricing_type === 'item' ? (
+          {/* Pricing Input - exactly like create order */}
+          {formData.pricing_type === 'item' ? (
             <ItemPricingInput
-              items={editOrder.items_detail}
+              items={formData.items_detail}
               onChange={handleItemsChange}
               onAmountCalculated={handleAmountCalculated}
             />
           ) : (
             <KgPricingInput
-              serviceTypeId={editOrder.service_type_id || ''}
-              weight={editOrder.total_weight || 0}
-              onServiceTypeChange={(serviceTypeId) => setEditOrder(prev => ({ ...prev, service_type_id: serviceTypeId }))}
-              onWeightChange={(weight) => setEditOrder(prev => ({ ...prev, total_weight: weight }))}
+              serviceTypeId={formData.service_type_id || ''}
+              weight={formData.total_weight || 0}
+              onServiceTypeChange={(serviceTypeId) => setFormData(prev => ({ ...prev, service_type_id: serviceTypeId }))}
+              onWeightChange={(weight) => setFormData(prev => ({ ...prev, total_weight: weight }))}
               onAmountCalculated={handleAmountCalculated}
             />
           )}
           
-          {/* Discount Section */}
+          {/* Discount Section - exactly like create order */}
           <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
             <div className="flex items-center gap-2">
               <Percent className="h-4 w-4 text-gray-600" />
@@ -314,7 +316,7 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="discountType">Type</Label>
-                <Select value={editOrder.discount_type} onValueChange={handleDiscountTypeChange}>
+                <Select value={formData.discount_type} onValueChange={handleDiscountTypeChange}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -331,9 +333,9 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
                   type="number"
                   placeholder="0"
                   min="0"
-                  step={editOrder.discount_type === 'percentage' ? "1" : "0.01"}
-                  max={editOrder.discount_type === 'percentage' ? "100" : undefined}
-                  value={editOrder.discount || ''}
+                  step={formData.discount_type === 'percentage' ? "1" : "0.01"}
+                  max={formData.discount_type === 'percentage' ? "100" : undefined}
+                  value={formData.discount || ''}
                   onChange={(e) => handleDiscountChange(Number(e.target.value))}
                 />
               </div>
@@ -342,7 +344,7 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
                 <Input 
                   id="subtotal" 
                   type="number" 
-                  value={editOrder.subtotal || ''}
+                  value={formData.subtotal || ''}
                   readOnly
                   className="bg-gray-100"
                 />
@@ -350,10 +352,11 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
             </div>
           </div>
           
+          {/* Status, Priority, Amount - exactly like create order */}
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
-              <Select value={editOrder.status} onValueChange={(value: Order['status']) => setEditOrder(prev => ({ ...prev, status: value }))}>
+              <Select value={formData.status} onValueChange={(value: Order['status']) => setFormData(prev => ({ ...prev, status: value }))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -368,7 +371,7 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
             </div>
             <div className="space-y-2">
               <Label htmlFor="priority">Priority</Label>
-              <Select value={editOrder.priority} onValueChange={(value: Order['priority']) => setEditOrder(prev => ({ ...prev, priority: value }))}>
+              <Select value={formData.priority} onValueChange={(value: Order['priority']) => setFormData(prev => ({ ...prev, priority: value }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select priority" />
                 </SelectTrigger>
@@ -386,24 +389,25 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
                 type="number" 
                 placeholder="0.00" 
                 step="0.01"
-                value={editOrder.amount || ''}
-                onChange={(e) => setEditOrder(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                value={formData.amount || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, amount: Number(e.target.value) }))}
               />
             </div>
           </div>
           
+          {/* Due Date - exactly like create order */}
           <div className="space-y-2">
             <Label htmlFor="dueDate">Due Date</Label>
             <Input 
               id="dueDate" 
               type="date"
-              value={editOrder.due_date}
-              onChange={(e) => setEditOrder(prev => ({ ...prev, due_date: e.target.value }))}
+              value={formData.due_date}
+              onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
             />
           </div>
 
-          {/* Payment Management Section - Only for item-based orders */}
-          {editOrder.pricing_type === 'item' && orderItems.length > 0 && (
+          {/* Payment Management Section - KEEP UNCHANGED for item-based orders */}
+          {formData.pricing_type === 'item' && orderItems.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -493,12 +497,13 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
           )}
         </div>
         
+        {/* Footer Buttons - exactly like create order */}
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={updateOrder.isPending}>
-            {updateOrder.isPending ? 'Saving...' : 'Save Changes'}
+          <Button onClick={handleSubmit} disabled={updateOrder.isPending}>
+            {updateOrder.isPending ? 'Updating...' : 'Update Order'}
           </Button>
         </div>
       </DialogContent>
