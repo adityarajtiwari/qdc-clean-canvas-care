@@ -1,435 +1,157 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useOrders } from '@/hooks/useOrders';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Search, Plus, Calendar, Percent, CreditCard } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useOrders, useCreateOrder, Order, OrderItem } from '@/hooks/useOrders';
-import { useCreateCustomer } from '@/hooks/useCustomers';
+import { Plus, Search, Filter, Package, CreditCard, Download } from 'lucide-react';
+import OrderActions from './OrderActions';
+import CreateOrderDialog from './CreateOrderDialog';
+import Pagination from './Pagination';
 import { useToast } from '@/hooks/use-toast';
-import OrderActions from '@/components/OrderActions';
-import Pagination from '@/components/Pagination';
-import CustomerSearch from '@/components/CustomerSearch';
-import PricingSelector from '@/components/PricingSelector';
-import ItemPricingInput from '@/components/ItemPricingInput';
-import KgPricingInput from '@/components/KgPricingInput';
+import jsPDF from 'jspdf';
 
 const OrderManagement = () => {
+  const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   
-  const itemsPerPage = 5; // Fixed to show only 5 orders per page
-  const { data, isLoading } = useOrders(currentPage, itemsPerPage, searchTerm, statusFilter, paymentFilter);
-  const createOrder = useCreateOrder();
-  const createCustomer = useCreateCustomer();
+  const { data, isLoading, error } = useOrders(currentPage, 10, searchTerm, statusFilter, paymentFilter);
   const { toast } = useToast();
 
-  const orders = data?.orders || [];
-  const totalPages = data?.totalPages || 1;
-  const totalCount = data?.totalCount || 0;
-
-  const [newOrder, setNewOrder] = useState<{
-    customer_id?: string;
-    customer_name: string;
-    customer_phone: string;
-    items: string;
-    items_detail: Record<string, OrderItem>;
-    priority: Order['priority'];
-    amount: number;
-    due_date: string;
-    pricing_type: 'item' | 'kg';
-    service_type_id?: string;
-    total_weight?: number;
-    subtotal: number;
-    discount: number;
-    discount_type: 'percentage' | 'fixed';
-  }>({
-    customer_name: '',
-    customer_phone: '',
-    items: '',
-    items_detail: {},
-    priority: 'normal',
-    amount: 0,
-    due_date: '',
-    pricing_type: 'item',
-    total_weight: 0,
-    subtotal: 0,
-    discount: 0,
-    discount_type: 'percentage'
-  });
+  const generateInvoice = (order: any) => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(20);
+    doc.setTextColor(40, 44, 52);
+    doc.text('LAUNDRY INVOICE', 20, 30);
+    
+    // Order details
+    doc.setFontSize(12);
+    doc.text(`Order Number: ${order.order_number}`, 20, 50);
+    doc.text(`Customer: ${order.customer_name}`, 20, 60);
+    doc.text(`Phone: ${order.customer_phone || 'N/A'}`, 20, 70);
+    doc.text(`Date: ${new Date(order.created_at).toLocaleDateString()}`, 20, 80);
+    doc.text(`Due Date: ${new Date(order.due_date).toLocaleDateString()}`, 20, 90);
+    doc.text(`Status: ${order.status.toUpperCase()}`, 20, 100);
+    
+    // Items
+    doc.text('Items:', 20, 120);
+    doc.text(order.items, 20, 130);
+    
+    // Amount
+    doc.setFontSize(14);
+    doc.setTextColor(0, 128, 0);
+    doc.text(`Total Amount: ₹${order.amount.toFixed(2)}`, 20, 160);
+    
+    // Footer
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text('Thank you for choosing our laundry service!', 20, 280);
+    
+    doc.save(`invoice-${order.order_number}.pdf`);
+    
+    toast({
+      title: "Success",
+      description: "Invoice downloaded successfully"
+    });
+  };
 
   const getStatusColor = (status: string) => {
-    const colors = {
-      'received': 'bg-blue-100 text-blue-800',
-      'processing': 'bg-yellow-100 text-yellow-800',
-      'ready': 'bg-green-100 text-green-800',
-      'completed': 'bg-gray-100 text-gray-800',
-      'delayed': 'bg-red-100 text-red-800'
-    };
-    return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+    switch (status) {
+      case 'received': return 'bg-blue-100 text-blue-800';
+      case 'processing': return 'bg-yellow-100 text-yellow-800';
+      case 'ready': return 'bg-green-100 text-green-800';
+      case 'completed': return 'bg-gray-100 text-gray-800';
+      case 'delayed': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   };
 
   const getPriorityColor = (priority: string) => {
-    const colors = {
-      'low': 'bg-gray-100 text-gray-800',
-      'normal': 'bg-blue-100 text-blue-800',
-      'urgent': 'bg-red-100 text-red-800'
-    };
-    return colors[priority as keyof typeof colors] || 'bg-gray-100 text-gray-800';
-  };
-
-  const handleSearch = (value: string) => {
-    setSearchTerm(value);
-    setCurrentPage(1);
-  };
-
-  const handleStatusFilter = (value: string) => {
-    setStatusFilter(value);
-    setCurrentPage(1);
-  };
-
-  const handlePaymentFilter = (value: string) => {
-    setPaymentFilter(value);
-    setCurrentPage(1);
-  };
-
-  const handleCustomerSelect = (customerId: string, customerName: string, customerPhone?: string) => {
-    setNewOrder(prev => ({
-      ...prev,
-      customer_id: customerId,
-      customer_name: customerName,
-      customer_phone: customerPhone || ''
-    }));
-  };
-
-  const handleNewCustomer = async (name: string, phone: string) => {
-    try {
-      const newCustomer = await createCustomer.mutateAsync({
-        name,
-        phone,
-        email: `${name.toLowerCase().replace(/\s+/g, '')}@temp.com`,
-        status: 'active' as const,
-        loyalty_tier: 'bronze' as const,
-        total_orders: 0,
-        total_spent: 0,
-        rating: 0
-      });
-      
-      handleCustomerSelect(newCustomer.id, newCustomer.name, newCustomer.phone || undefined);
-      
-      toast({
-        title: "Success",
-        description: "Customer created successfully"
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create customer",
-        variant: "destructive"
-      });
+    switch (priority) {
+      case 'urgent': return 'bg-red-100 text-red-800';
+      case 'normal': return 'bg-blue-100 text-blue-800';
+      case 'low': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const handleItemsChange = (items: Record<string, OrderItem>) => {
-    const itemsString = Object.values(items)
-      .map(item => `${item.name} (${item.quantity})`)
-      .join(', ');
+  const getPaymentStatusColor = (order: any) => {
+    if (order.pricing_type === 'kg') {
+      return 'bg-green-100 text-green-800'; // KG orders are always considered paid
+    }
     
-    setNewOrder(prev => ({
-      ...prev,
-      items: itemsString,
-      items_detail: items
-    }));
-  };
-
-  const handleAmountCalculated = (amount: number) => {
-    setNewOrder(prev => ({
-      ...prev,
-      subtotal: amount,
-      amount: calculateFinalAmount(amount, prev.discount, prev.discount_type)
-    }));
-  };
-
-  const calculateFinalAmount = (subtotal: number, discount: number, discountType: 'percentage' | 'fixed') => {
-    if (discountType === 'percentage') {
-      return subtotal - (subtotal * discount / 100);
-    } else {
-      return Math.max(0, subtotal - discount);
+    if (order.has_pending_payments) {
+      return 'bg-red-100 text-red-800';
     }
+    
+    return 'bg-green-100 text-green-800';
   };
 
-  const handleDiscountChange = (discount: number) => {
-    setNewOrder(prev => ({
-      ...prev,
-      discount,
-      amount: calculateFinalAmount(prev.subtotal, discount, prev.discount_type)
-    }));
-  };
-
-  const handleDiscountTypeChange = (discountType: 'percentage' | 'fixed') => {
-    setNewOrder(prev => ({
-      ...prev,
-      discount_type: discountType,
-      amount: calculateFinalAmount(prev.subtotal, prev.discount, discountType)
-    }));
-  };
-
-  const handlePricingTypeChange = (pricingType: 'item' | 'kg') => {
-    setNewOrder(prev => ({
-      ...prev,
-      pricing_type: pricingType,
-      items: '',
-      items_detail: {},
-      service_type_id: undefined,
-      total_weight: 0,
-      subtotal: 0,
-      amount: 0,
-      discount: 0
-    }));
-  };
-
-  const handleCreateOrder = async () => {
-    if (!newOrder.customer_name || !newOrder.due_date || newOrder.amount <= 0) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive"
-      });
-      return;
+  const getPaymentStatusText = (order: any) => {
+    if (order.pricing_type === 'kg') {
+      return 'Paid';
     }
-
-    if (newOrder.pricing_type === 'item' && Object.keys(newOrder.items_detail).length === 0) {
-      toast({
-        title: "Error",
-        description: "Please add at least one item",
-        variant: "destructive"
-      });
-      return;
+    
+    if (order.has_pending_payments) {
+      return 'Pending';
     }
-
-    if (newOrder.pricing_type === 'kg' && (!newOrder.service_type_id || !newOrder.total_weight)) {
-      toast({
-        title: "Error",
-        description: "Please select service type and enter weight",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      await createOrder.mutateAsync({
-        ...newOrder,
-        items: newOrder.pricing_type === 'kg' ? `Weight-based service: ${newOrder.total_weight}kg` : newOrder.items,
-        status: 'received' as const,
-        quality_score: 0,
-        date_received: new Date().toISOString()
-      });
-      
-      setIsNewOrderOpen(false);
-      setNewOrder({
-        customer_name: '',
-        customer_phone: '',
-        items: '',
-        items_detail: {},
-        priority: 'normal',
-        amount: 0,
-        due_date: '',
-        pricing_type: 'item',
-        total_weight: 0,
-        subtotal: 0,
-        discount: 0,
-        discount_type: 'percentage'
-      });
-      
-      toast({
-        title: "Success",
-        description: "Order created successfully"
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create order",
-        variant: "destructive"
-      });
-    }
+    
+    return 'Paid';
   };
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-        <div className="text-center py-20">
-          <p className="text-gray-600">Loading orders...</p>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg">Loading orders...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg text-red-600">Error loading orders: {error.message}</div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Order Management</h1>
-          <p className="text-gray-600">Track and manage all laundry orders</p>
-        </div>
-        <Dialog open={isNewOrderOpen} onOpenChange={setIsNewOrderOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="h-4 w-4 mr-2" />
-              New Order
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create New Order</DialogTitle>
-              <DialogDescription>
-                Enter the details for the new laundry order.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-6 py-4">
-              <CustomerSearch
-                value={newOrder.customer_id}
-                onSelect={handleCustomerSelect}
-                onNewCustomer={handleNewCustomer}
-              />
-              
-              <PricingSelector
-                value={newOrder.pricing_type}
-                onChange={handlePricingTypeChange}
-              />
-              
-              {newOrder.pricing_type === 'item' ? (
-                <ItemPricingInput
-                  items={newOrder.items_detail}
-                  onChange={handleItemsChange}
-                  onAmountCalculated={handleAmountCalculated}
-                />
-              ) : (
-                <KgPricingInput
-                  serviceTypeId={newOrder.service_type_id || ''}
-                  weight={newOrder.total_weight || 0}
-                  onServiceTypeChange={(serviceTypeId) => setNewOrder(prev => ({ ...prev, service_type_id: serviceTypeId }))}
-                  onWeightChange={(weight) => setNewOrder(prev => ({ ...prev, total_weight: weight }))}
-                  onAmountCalculated={handleAmountCalculated}
-                />
-              )}
-              
-              {/* Discount Section */}
-              <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
-                <div className="flex items-center gap-2">
-                  <Percent className="h-4 w-4 text-gray-600" />
-                  <Label className="text-sm font-medium">Discount</Label>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="discountType">Type</Label>
-                    <Select value={newOrder.discount_type} onValueChange={handleDiscountTypeChange}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="percentage">Percentage (%)</SelectItem>
-                        <SelectItem value="fixed">Fixed Amount (₹)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="discount">Discount</Label>
-                    <Input
-                      id="discount"
-                      type="number"
-                      placeholder="0"
-                      min="0"
-                      step={newOrder.discount_type === 'percentage' ? "1" : "0.01"}
-                      max={newOrder.discount_type === 'percentage' ? "100" : undefined}
-                      value={newOrder.discount || ''}
-                      onChange={(e) => handleDiscountChange(Number(e.target.value))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="subtotal">Subtotal (₹)</Label>
-                    <Input 
-                      id="subtotal" 
-                      type="number" 
-                      value={newOrder.subtotal || ''}
-                      readOnly
-                      className="bg-gray-100"
-                    />
-                  </div>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="priority">Priority</Label>
-                  <Select value={newOrder.priority} onValueChange={(value: Order['priority']) => setNewOrder(prev => ({ ...prev, priority: value }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="normal">Normal</SelectItem>
-                      <SelectItem value="urgent">Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="amount">Final Amount (₹)</Label>
-                  <Input 
-                    id="amount" 
-                    type="number" 
-                    placeholder="0.00" 
-                    step="0.01"
-                    value={newOrder.amount || ''}
-                    onChange={(e) => setNewOrder(prev => ({ ...prev, amount: Number(e.target.value) }))}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dueDate">Due Date</Label>
-                <Input 
-                  id="dueDate" 
-                  type="date"
-                  value={newOrder.due_date}
-                  onChange={(e) => setNewOrder(prev => ({ ...prev, due_date: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsNewOrderOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreateOrder} disabled={createOrder.isPending}>
-                {createOrder.isPending ? 'Creating...' : 'Create Order'}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Order Management</h1>
+        <Button onClick={() => setShowCreateDialog(true)} className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          New Order
+        </Button>
       </div>
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex gap-4 items-center">
-            <div className="relative flex-1">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                placeholder="Search orders by customer name or order ID..."
+                placeholder="Search orders..."
                 value={searchTerm}
-                onChange={(e) => handleSearch(e.target.value)}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
-            <Select value={statusFilter} onValueChange={handleStatusFilter}>
-              <SelectTrigger className="w-48">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
@@ -441,14 +163,14 @@ const OrderManagement = () => {
                 <SelectItem value="delayed">Delayed</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={paymentFilter} onValueChange={handlePaymentFilter}>
-              <SelectTrigger className="w-48">
+            <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+              <SelectTrigger>
                 <SelectValue placeholder="Filter by payment" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Payments</SelectItem>
-                <SelectItem value="pending">Pending Payments</SelectItem>
-                <SelectItem value="completed">Completed Payments</SelectItem>
+                <SelectItem value="pending">Pending Payment</SelectItem>
+                <SelectItem value="completed">Payment Completed</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -459,118 +181,116 @@ const OrderManagement = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            Orders ({totalCount})
-            {paymentFilter === 'pending' && (
-              <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200">
-                <CreditCard className="h-3 w-3 mr-1" />
-                Pending Payments
-              </Badge>
-            )}
+            <Package className="h-5 w-5" />
+            Orders ({data?.totalCount || 0})
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
-          <div className="p-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order ID</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Items/Service</TableHead>
-                  <TableHead>Pricing</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Quality</TableHead>
-                  <TableHead>Payment</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium">{order.order_number}</TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{order.customer_name}</p>
-                        {order.customer_phone && (
-                          <p className="text-sm text-gray-600">{order.customer_phone}</p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="text-sm">{order.items}</p>
-                        {order.pricing_type === 'kg' && order.total_weight && (
-                          <p className="text-xs text-gray-500">{order.total_weight}kg</p>
-                        )}
-                        {order.pricing_type === 'item' && order.items_detail && Object.keys(order.items_detail).length > 0 && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            {Object.values(order.items_detail).reduce((sum, item) => sum + item.quantity, 0)} items
+        <CardContent>
+          {data?.orders && data.orders.length > 0 ? (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-3 font-medium">Order #</th>
+                      <th className="text-left p-3 font-medium">Customer</th>
+                      <th className="text-left p-3 font-medium">Items</th>
+                      <th className="text-left p-3 font-medium">Status</th>
+                      <th className="text-left p-3 font-medium">Priority</th>
+                      <th className="text-left p-3 font-medium">Payment</th>
+                      <th className="text-left p-3 font-medium">Amount</th>
+                      <th className="text-left p-3 font-medium">Due Date</th>
+                      <th className="text-right p-3 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.orders.map((order) => (
+                      <tr key={order.id} className="border-b hover:bg-gray-50">
+                        <td className="p-3 font-mono text-sm">{order.order_number}</td>
+                        <td className="p-3">
+                          <div>
+                            <div className="font-medium">{order.customer_name}</div>
+                            {order.customer_phone && (
+                              <div className="text-sm text-gray-500">{order.customer_phone}</div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {order.pricing_type === 'kg' ? 'By Weight' : 'By Items'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(order.status)}>
-                        {order.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getPriorityColor(order.priority)}>
-                        {order.priority}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4 text-gray-400" />
-                        {new Date(order.due_date).toLocaleDateString()}
-                      </div>
-                    </TableCell>
-                    <TableCell>₹{order.amount.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${order.quality_score >= 95 ? 'bg-green-500' : order.quality_score >= 90 ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
-                        {order.quality_score}%
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {order.pricing_type === 'item' ? (
-                        <Badge 
-                          variant="outline" 
-                          className={order.has_pending_payments ? 'bg-yellow-50 text-yellow-800 border-yellow-200' : 'bg-green-50 text-green-800 border-green-200'}
-                        >
-                          {order.has_pending_payments ? 'Pending' : 'Completed'}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-gray-50 text-gray-600">
-                          N/A
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <OrderActions order={order} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          
-          <div className="p-6 border-t">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
-          </div>
+                        </td>
+                        <td className="p-3 max-w-xs">
+                          <div className="truncate text-sm">{order.items}</div>
+                        </td>
+                        <td className="p-3">
+                          <Badge className={getStatusColor(order.status)}>
+                            {order.status}
+                          </Badge>
+                        </td>
+                        <td className="p-3">
+                          <Badge className={getPriorityColor(order.priority)}>
+                            {order.priority}
+                          </Badge>
+                        </td>
+                        <td className="p-3">
+                          <Badge className={getPaymentStatusColor(order)}>
+                            {getPaymentStatusText(order)}
+                          </Badge>
+                        </td>
+                        <td className="p-3 font-medium">₹{order.amount.toFixed(2)}</td>
+                        <td className="p-3 text-sm">
+                          {new Date(order.due_date).toLocaleDateString()}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => generateInvoice(order)}
+                              className="flex items-center gap-1"
+                            >
+                              <Download className="h-3 w-3" />
+                              Invoice
+                            </Button>
+                            <OrderActions order={order} />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {data.totalPages > 1 && (
+                <div className="mt-6">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={data.totalPages}
+                    onPageChange={setCurrentPage}
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No orders found</h3>
+              <p className="text-gray-500 mb-4">
+                {searchTerm || statusFilter !== 'all' || paymentFilter !== 'all'
+                  ? "Try adjusting your filters to see more results."
+                  : "Get started by creating your first order."}
+              </p>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Order
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {showCreateDialog && (
+        <CreateOrderDialog 
+          open={showCreateDialog}
+          onOpenChange={setShowCreateDialog}
+        />
+      )}
     </div>
   );
 };
