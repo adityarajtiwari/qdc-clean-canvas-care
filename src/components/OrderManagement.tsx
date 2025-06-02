@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Search, Plus, Calendar, Percent } from 'lucide-react';
+import { Search, Plus, Calendar, Percent, CreditCard } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useOrders, useCreateOrder, Order, OrderItem } from '@/hooks/useOrders';
 import { useCreateCustomer } from '@/hooks/useCustomers';
@@ -22,11 +22,12 @@ import KgPricingInput from '@/components/KgPricingInput';
 const OrderManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [paymentFilter, setPaymentFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
   
   const itemsPerPage = 5; // Fixed to show only 5 orders per page
-  const { data, isLoading } = useOrders(currentPage, itemsPerPage, searchTerm, statusFilter);
+  const { data, isLoading } = useOrders(currentPage, itemsPerPage, searchTerm, statusFilter, paymentFilter);
   const createOrder = useCreateOrder();
   const createCustomer = useCreateCustomer();
   const { toast } = useToast();
@@ -92,6 +93,11 @@ const OrderManagement = () => {
 
   const handleStatusFilter = (value: string) => {
     setStatusFilter(value);
+    setCurrentPage(1);
+  };
+
+  const handlePaymentFilter = (value: string) => {
+    setPaymentFilter(value);
     setCurrentPage(1);
   };
 
@@ -435,6 +441,16 @@ const OrderManagement = () => {
                 <SelectItem value="delayed">Delayed</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={paymentFilter} onValueChange={handlePaymentFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by payment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Payments</SelectItem>
+                <SelectItem value="pending">Pending Payments</SelectItem>
+                <SelectItem value="completed">Completed Payments</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -442,7 +458,15 @@ const OrderManagement = () => {
       {/* Orders Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Orders ({totalCount})</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Orders ({totalCount})
+            {paymentFilter === 'pending' && (
+              <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200">
+                <CreditCard className="h-3 w-3 mr-1" />
+                Pending Payments
+              </Badge>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="p-6">
@@ -458,6 +482,7 @@ const OrderManagement = () => {
                   <TableHead>Due Date</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Quality</TableHead>
+                  <TableHead>Payment</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -513,6 +538,20 @@ const OrderManagement = () => {
                         <div className={`w-2 h-2 rounded-full ${order.quality_score >= 95 ? 'bg-green-500' : order.quality_score >= 90 ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
                         {order.quality_score}%
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {order.pricing_type === 'item' ? (
+                        <Badge 
+                          variant="outline" 
+                          className={order.has_pending_payments ? 'bg-yellow-50 text-yellow-800 border-yellow-200' : 'bg-green-50 text-green-800 border-green-200'}
+                        >
+                          {order.has_pending_payments ? 'Pending' : 'Completed'}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-gray-50 text-gray-600">
+                          N/A
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       <OrderActions order={order} />

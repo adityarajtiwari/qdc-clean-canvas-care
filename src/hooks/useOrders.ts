@@ -31,15 +31,22 @@ export interface Order {
   discount_type?: 'percentage' | 'fixed';
   created_at: string;
   updated_at: string;
+  has_pending_payments?: boolean;
 }
 
-export const useOrders = (page: number = 1, limit: number = 10, searchTerm?: string, statusFilter?: string) => {
+export const useOrders = (page: number = 1, limit: number = 10, searchTerm?: string, statusFilter?: string, paymentFilter?: string) => {
   return useQuery({
-    queryKey: ['orders', page, limit, searchTerm, statusFilter],
+    queryKey: ['orders', page, limit, searchTerm, statusFilter, paymentFilter],
     queryFn: async () => {
       let query = supabase
         .from('orders')
-        .select('*', { count: 'exact' })
+        .select(`
+          *,
+          order_items!left (
+            id,
+            payment_pending
+          )
+        `, { count: 'exact' })
         .order('created_at', { ascending: false });
 
       // Apply filters
@@ -51,29 +58,49 @@ export const useOrders = (page: number = 1, limit: number = 10, searchTerm?: str
         query = query.eq('status', statusFilter);
       }
 
-      // Apply pagination
-      const from = (page - 1) * limit;
-      const to = from + limit - 1;
-      query = query.range(from, to);
-
       const { data, error, count } = await query;
 
       if (error) throw error;
       
-      // Transform the data to match our Order interface
-      const transformedData: Order[] = (data || []).map(order => ({
-        ...order,
-        status: order.status as Order['status'],
-        priority: order.priority as Order['priority'],
-        pricing_type: (order.pricing_type as Order['pricing_type']) || 'item',
-        discount_type: (order.discount_type as Order['discount_type']) || 'percentage',
-        items_detail: (order.items_detail as unknown as Record<string, OrderItem>) || {}
-      }));
+      // Transform the data to match our Order interface and filter by payment status
+      let transformedData: Order[] = (data || []).map(order => {
+        const orderItems = order.order_items || [];
+        const hasPendingPayments = order.pricing_type === 'item' && orderItems.some((item: any) => item.payment_pending);
+        
+        return {
+          ...order,
+          status: order.status as Order['status'],
+          priority: order.priority as Order['priority'],
+          pricing_type: (order.pricing_type as Order['pricing_type']) || 'item',
+          discount_type: (order.discount_type as Order['discount_type']) || 'percentage',
+          items_detail: (order.items_detail as unknown as Record<string, OrderItem>) || {},
+          has_pending_payments: hasPendingPayments
+        };
+      });
+
+      // Apply payment filter after transformation
+      if (paymentFilter && paymentFilter !== 'all') {
+        if (paymentFilter === 'pending') {
+          transformedData = transformedData.filter(order => 
+            order.pricing_type === 'item' && order.has_pending_payments
+          );
+        } else if (paymentFilter === 'completed') {
+          transformedData = transformedData.filter(order => 
+            order.pricing_type === 'kg' || !order.has_pending_payments
+          );
+        }
+      }
+
+      // Apply pagination after filtering
+      const totalFilteredCount = transformedData.length;
+      const from = (page - 1) * limit;
+      const to = from + limit;
+      const paginatedData = transformedData.slice(from, to);
 
       return { 
-        orders: transformedData, 
-        totalCount: count || 0,
-        totalPages: Math.ceil((count || 0) / limit)
+        orders: paginatedData, 
+        totalCount: totalFilteredCount,
+        totalPages: Math.ceil(totalFilteredCount / limit)
       };
     },
   });
