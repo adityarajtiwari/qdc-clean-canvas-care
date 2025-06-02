@@ -5,7 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, X, Tag, FileText } from 'lucide-react';
+import { useActiveItemsOnly } from '@/hooks/useLaundryItems';
 
 interface WeightBasedItem {
   name: string;
@@ -21,20 +23,24 @@ interface WeightBasedItemListProps {
 const commonTags = ['stained', 'torn', 'delicate', 'new', 'heavily soiled', 'dry clean only'];
 
 const WeightBasedItemList = ({ items, onChange }: WeightBasedItemListProps) => {
-  const [newItemName, setNewItemName] = useState('');
+  const [selectedItemId, setSelectedItemId] = useState('');
   const [expandedItem, setExpandedItem] = useState<number | null>(null);
+  const { data: laundryItems, isLoading } = useActiveItemsOnly();
 
   const addItem = () => {
-    if (!newItemName.trim()) return;
+    if (!selectedItemId) return;
+    
+    const selectedItem = laundryItems?.find(item => item.id === selectedItemId);
+    if (!selectedItem) return;
     
     const updatedItems = [...items, {
-      name: newItemName,
+      name: selectedItem.name,
       notes: '',
       tags: []
     }];
     
     onChange(updatedItems);
-    setNewItemName('');
+    setSelectedItemId('');
   };
 
   const updateNotes = (index: number, notes: string) => {
@@ -171,13 +177,24 @@ const WeightBasedItemList = ({ items, onChange }: WeightBasedItemListProps) => {
 
       {/* Add new item */}
       <div className="flex gap-2">
-        <Input
-          placeholder="Item name (e.g., Shirts, Pants, Bedsheets)"
-          value={newItemName}
-          onChange={(e) => setNewItemName(e.target.value)}
-          className="flex-1"
-        />
-        <Button type="button" onClick={addItem} variant="outline">
+        <Select value={selectedItemId} onValueChange={setSelectedItemId}>
+          <SelectTrigger className="flex-1">
+            <SelectValue placeholder={isLoading ? "Loading items..." : "Select item from laundry items"} />
+          </SelectTrigger>
+          <SelectContent>
+            {laundryItems?.map((item) => (
+              <SelectItem key={item.id} value={item.id}>
+                {item.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button 
+          type="button" 
+          onClick={addItem} 
+          variant="outline"
+          disabled={!selectedItemId}
+        >
           <Plus className="h-4 w-4" />
         </Button>
       </div>

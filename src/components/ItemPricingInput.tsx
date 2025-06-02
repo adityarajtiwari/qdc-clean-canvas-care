@@ -3,9 +3,11 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trash, Plus } from 'lucide-react';
+import { Trash, Plus, X, Tag, FileText } from 'lucide-react';
 import { useActiveItemsOnly } from '@/hooks/useLaundryItems';
 import { OrderItem } from '@/hooks/useOrders';
 
@@ -15,10 +17,13 @@ interface ItemPricingInputProps {
   onAmountCalculated: (amount: number) => void;
 }
 
+const commonTags = ['stained', 'torn', 'delicate', 'new', 'heavily soiled', 'dry clean only'];
+
 const ItemPricingInput = ({ items, onChange, onAmountCalculated }: ItemPricingInputProps) => {
   const { data: laundryItems, isLoading } = useActiveItemsOnly();
   const [selectedItemId, setSelectedItemId] = useState('');
   const [quantity, setQuantity] = useState(1);
+  const [expandedItem, setExpandedItem] = useState<string | null>(null);
 
   const addItem = () => {
     if (!selectedItemId || quantity <= 0) return;
@@ -46,6 +51,9 @@ const ItemPricingInput = ({ items, onChange, onAmountCalculated }: ItemPricingIn
     const newItems = { ...items };
     delete newItems[itemId];
     onChange(newItems);
+    if (expandedItem === itemId) {
+      setExpandedItem(null);
+    }
   };
 
   const updateQuantity = (itemId: string, newQuantity: number) => {
@@ -59,6 +67,43 @@ const ItemPricingInput = ({ items, onChange, onAmountCalculated }: ItemPricingIn
       [itemId]: {
         ...items[itemId],
         quantity: newQuantity
+      }
+    };
+    onChange(newItems);
+  };
+
+  const updateNotes = (itemId: string, notes: string) => {
+    const newItems = {
+      ...items,
+      [itemId]: {
+        ...items[itemId],
+        notes
+      }
+    };
+    onChange(newItems);
+  };
+
+  const addTag = (itemId: string, tag: string) => {
+    const currentTags = items[itemId].tags || [];
+    if (!currentTags.includes(tag)) {
+      const newItems = {
+        ...items,
+        [itemId]: {
+          ...items[itemId],
+          tags: [...currentTags, tag]
+        }
+      };
+      onChange(newItems);
+    }
+  };
+
+  const removeTag = (itemId: string, tagToRemove: string) => {
+    const currentTags = items[itemId].tags || [];
+    const newItems = {
+      ...items,
+      [itemId]: {
+        ...items[itemId],
+        tags: currentTags.filter(tag => tag !== tagToRemove)
       }
     };
     onChange(newItems);
@@ -123,35 +168,123 @@ const ItemPricingInput = ({ items, onChange, onAmountCalculated }: ItemPricingIn
                 <TableHead>Quantity</TableHead>
                 <TableHead>Price/Item</TableHead>
                 <TableHead>Total</TableHead>
+                <TableHead>Notes/Tags</TableHead>
                 <TableHead>Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {Object.entries(items).map(([itemId, item]) => (
-                <TableRow key={itemId}>
-                  <TableCell>{item.name}</TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={item.quantity}
-                      onChange={(e) => updateQuantity(itemId, parseInt(e.target.value) || 0)}
-                      className="w-20"
-                    />
-                  </TableCell>
-                  <TableCell>₹{item.price?.toFixed(2)}</TableCell>
-                  <TableCell>₹{((item.quantity * (item.price || 0))).toFixed(2)}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeItem(itemId)}
-                      className="text-red-600"
-                    >
-                      <Trash className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                <React.Fragment key={itemId}>
+                  <TableRow>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{item.name}</div>
+                        {item.tags && item.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {item.tags.map((tag, index) => (
+                              <Badge key={index} variant="secondary" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) => updateQuantity(itemId, parseInt(e.target.value) || 0)}
+                        className="w-20"
+                      />
+                    </TableCell>
+                    <TableCell>₹{item.price?.toFixed(2)}</TableCell>
+                    <TableCell>₹{((item.quantity * (item.price || 0))).toFixed(2)}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setExpandedItem(expandedItem === itemId ? null : itemId)}
+                        className="text-blue-600"
+                      >
+                        <FileText className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeItem(itemId)}
+                        className="text-red-600"
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                  
+                  {expandedItem === itemId && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="bg-gray-50">
+                        <div className="space-y-3 p-3">
+                          <div className="space-y-2">
+                            <Label className="text-xs font-medium flex items-center gap-1">
+                              <FileText className="h-3 w-3" />
+                              Notes
+                            </Label>
+                            <Textarea
+                              placeholder="Add notes about this item..."
+                              value={item.notes || ''}
+                              onChange={(e) => updateNotes(itemId, e.target.value)}
+                              className="min-h-[60px] text-xs"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-xs font-medium flex items-center gap-1">
+                              <Tag className="h-3 w-3" />
+                              Quick Tags
+                            </Label>
+                            <div className="flex flex-wrap gap-1">
+                              {commonTags.map((tag) => (
+                                <Button
+                                  key={tag}
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-6 text-xs"
+                                  onClick={() => addTag(itemId, tag)}
+                                  disabled={item.tags?.includes(tag)}
+                                >
+                                  {tag}
+                                </Button>
+                              ))}
+                            </div>
+                            
+                            {item.tags && item.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {item.tags.map((tag, index) => (
+                                  <Badge key={index} variant="secondary" className="text-xs">
+                                    {tag}
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-3 w-3 p-0 ml-1"
+                                      onClick={() => removeTag(itemId, tag)}
+                                    >
+                                      <X className="h-2 w-2" />
+                                    </Button>
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
               ))}
             </TableBody>
           </Table>
