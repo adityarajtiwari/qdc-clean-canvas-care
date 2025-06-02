@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useOrders } from '@/hooks/useOrders';
 import { Button } from '@/components/ui/button';
@@ -31,21 +30,79 @@ const OrderManagement = () => {
     
     // Order details
     doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
     doc.text(`Order Number: ${order.order_number}`, 20, 50);
     doc.text(`Customer: ${order.customer_name}`, 20, 60);
     doc.text(`Phone: ${order.customer_phone || 'N/A'}`, 20, 70);
-    doc.text(`Date: ${new Date(order.created_at).toLocaleDateString()}`, 20, 80);
+    doc.text(`Date Received: ${new Date(order.date_received || order.created_at).toLocaleDateString()}`, 20, 80);
     doc.text(`Due Date: ${new Date(order.due_date).toLocaleDateString()}`, 20, 90);
+    
+    // Order status and priority
     doc.text(`Status: ${order.status.toUpperCase()}`, 20, 100);
+    doc.text(`Priority: ${order.priority.toUpperCase()}`, 20, 110);
+    doc.text(`Pricing Type: ${order.pricing_type?.toUpperCase() || 'ITEM'}`, 20, 120);
     
-    // Items
-    doc.text('Items:', 20, 120);
-    doc.text(order.items, 20, 130);
+    // Weight info for KG orders
+    if (order.pricing_type === 'kg' && order.total_weight) {
+      doc.text(`Total Weight: ${order.total_weight} kg`, 20, 130);
+    }
     
-    // Amount
+    // Items section
+    doc.setFontSize(14);
+    doc.setTextColor(40, 44, 52);
+    doc.text('Items:', 20, 150);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    
+    // Split items text into multiple lines if too long
+    const itemsText = order.items;
+    const splitText = doc.splitTextToSize(itemsText, 170);
+    doc.text(splitText, 20, 160);
+    
+    // Calculate Y position for next section
+    let currentY = 160 + (splitText.length * 5) + 10;
+    
+    // Quality score if available
+    if (order.quality_score !== undefined && order.quality_score > 0) {
+      doc.text(`Quality Score: ${order.quality_score}/10`, 20, currentY);
+      currentY += 10;
+    }
+    
+    // Completed date if available
+    if (order.completed_date) {
+      doc.text(`Completed Date: ${new Date(order.completed_date).toLocaleDateString()}`, 20, currentY);
+      currentY += 10;
+    }
+    
+    // Pricing breakdown
+    doc.setFontSize(12);
+    doc.setTextColor(40, 44, 52);
+    doc.text('Pricing Details:', 20, currentY + 10);
+    currentY += 20;
+    
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    
+    // Subtotal if available
+    if (order.subtotal && order.subtotal > 0) {
+      doc.text(`Subtotal: ₹${order.subtotal.toFixed(2)}`, 20, currentY);
+      currentY += 10;
+    }
+    
+    // Discount if applicable
+    if (order.discount && order.discount > 0) {
+      const discountText = order.discount_type === 'percentage' 
+        ? `Discount (${order.discount}%): -₹${((order.subtotal || order.amount) * order.discount / 100).toFixed(2)}`
+        : `Discount: -₹${order.discount.toFixed(2)}`;
+      doc.text(discountText, 20, currentY);
+      currentY += 10;
+    }
+    
+    // Final amount
     doc.setFontSize(14);
     doc.setTextColor(0, 128, 0);
-    doc.text(`Total Amount: ₹${order.amount.toFixed(2)}`, 20, 160);
+    doc.text(`Total Amount: ₹${order.amount.toFixed(2)}`, 20, currentY + 10);
     
     // Footer
     doc.setFontSize(10);
