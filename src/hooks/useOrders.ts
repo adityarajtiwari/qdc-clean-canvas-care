@@ -84,7 +84,8 @@ export const useCreateOrder = () => {
 
   return useMutation({
     mutationFn: async (order: Omit<Order, 'id' | 'order_number' | 'created_at' | 'updated_at'>) => {
-      const { data, error } = await supabase
+      // Create the order first
+      const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert({
           ...order,
@@ -94,11 +95,34 @@ export const useCreateOrder = () => {
         .select()
         .single();
 
-      if (error) throw error;
-      return data;
+      if (orderError) throw orderError;
+
+      // If this is an item-based order, create individual order items
+      if (order.pricing_type === 'item' && order.items_detail && Object.keys(order.items_detail).length > 0) {
+        const orderItems = Object.values(order.items_detail).map(item => ({
+          order_id: orderData.id,
+          item_name: item.name,
+          quantity: item.quantity,
+          price_per_item: item.price || 0,
+          total_price: (item.quantity * (item.price || 0)),
+          payment_pending: true
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('order_items')
+          .insert(orderItems);
+
+        if (itemsError) {
+          console.error('Error creating order items:', itemsError);
+          // Don't throw error here to avoid breaking order creation
+        }
+      }
+
+      return orderData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['order-items'] });
     },
   });
 };
@@ -143,6 +167,7 @@ export const useDeleteOrder = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['order-items'] });
     },
   });
 };
