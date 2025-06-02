@@ -35,6 +35,16 @@ const OrderActions = ({ order }: OrderActionsProps) => {
     }
   };
 
+  const handleEditClick = () => {
+    console.log('Edit clicked for order:', order.id);
+    setShowOrderDetailsDialog(true);
+  };
+
+  const handlePaymentClick = () => {
+    console.log('Payment clicked for order:', order.id);
+    setShowOrderDetailsDialog(true);
+  };
+
   return (
     <>
       <DropdownMenu>
@@ -45,26 +55,28 @@ const OrderActions = ({ order }: OrderActionsProps) => {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="bg-white border shadow-lg z-50">
-          <DropdownMenuItem onClick={() => setShowOrderDetailsDialog(true)}>
+          <DropdownMenuItem onClick={handleEditClick} className="cursor-pointer">
             <Edit className="mr-2 h-4 w-4" />
             Edit Order
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setShowOrderDetailsDialog(true)}>
+          <DropdownMenuItem onClick={handlePaymentClick} className="cursor-pointer">
             <CreditCard className="mr-2 h-4 w-4" />
             Payment Details
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleDelete} className="text-red-600">
+          <DropdownMenuItem onClick={handleDelete} className="text-red-600 cursor-pointer">
             <Trash2 className="mr-2 h-4 w-4" />
             Delete
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <OrderDetailsDialog 
-        open={showOrderDetailsDialog}
-        onOpenChange={setShowOrderDetailsDialog}
-        order={order}
-      />
+      {showOrderDetailsDialog && (
+        <OrderDetailsDialog 
+          open={showOrderDetailsDialog}
+          onOpenChange={setShowOrderDetailsDialog}
+          order={order}
+        />
+      )}
     </>
   );
 };

@@ -5,12 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useOrderItems, useUpdateOrderItemPayment } from '@/hooks/useOrderItems';
 import { useUpdateOrderStatus, Order } from '@/hooks/useOrders';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, User, Phone, Package, Percent, Scale, Edit } from 'lucide-react';
+import { Calendar, User, Phone, Package, Scale, Edit } from 'lucide-react';
 
 interface OrderDetailsDialogProps {
   open: boolean;
@@ -25,6 +24,9 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
   const { toast } = useToast();
   
   const [orderStatus, setOrderStatus] = useState<Order['status']>(order.status);
+
+  console.log('OrderDetailsDialog rendered for order:', order.id);
+  console.log('Order items:', orderItems);
 
   const handlePaymentStatusChange = async (itemId: string, paymentPending: boolean) => {
     try {
@@ -150,7 +152,7 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
                   <SelectTrigger className="w-48">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white z-50">
                     <SelectItem value="received">Received</SelectItem>
                     <SelectItem value="processing">Processing</SelectItem>
                     <SelectItem value="ready">Ready</SelectItem>
