@@ -2,14 +2,17 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useOrderItems, useUpdateOrderItemPayment } from '@/hooks/useOrderItems';
-import { useUpdateOrderStatus, Order } from '@/hooks/useOrders';
+import { useUpdateOrder, useUpdateOrderStatus, Order } from '@/hooks/useOrders';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, User, Phone, Package, Scale, Edit } from 'lucide-react';
+import { Calendar, User, Phone, Package, Scale, Edit, Trash2, Plus } from 'lucide-react';
 
 interface OrderDetailsDialogProps {
   open: boolean;
@@ -20,13 +23,52 @@ interface OrderDetailsDialogProps {
 const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogProps) => {
   const { data: orderItems = [], isLoading } = useOrderItems(order.id);
   const updatePayment = useUpdateOrderItemPayment();
+  const updateOrder = useUpdateOrder();
   const updateOrderStatus = useUpdateOrderStatus();
   const { toast } = useToast();
   
-  const [orderStatus, setOrderStatus] = useState<Order['status']>(order.status);
+  // Form state
+  const [customerName, setCustomerName] = useState(order.customer_name);
+  const [customerPhone, setCustomerPhone] = useState(order.customer_phone || '');
+  const [items, setItems] = useState(order.items);
+  const [status, setStatus] = useState<Order['status']>(order.status);
+  const [priority, setPriority] = useState<Order['priority']>(order.priority);
+  const [amount, setAmount] = useState(order.amount.toString());
+  const [dueDate, setDueDate] = useState(new Date(order.due_date).toISOString().split('T')[0]);
+  const [pricingType, setPricingType] = useState<Order['pricing_type']>(order.pricing_type);
+  const [totalWeight, setTotalWeight] = useState(order.total_weight?.toString() || '');
 
   console.log('OrderDetailsDialog rendered for order:', order.id);
   console.log('Order items:', orderItems);
+
+  const handleSave = async () => {
+    try {
+      await updateOrder.mutateAsync({
+        id: order.id,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        items,
+        status,
+        priority,
+        amount: parseFloat(amount),
+        due_date: new Date(dueDate).toISOString(),
+        pricing_type: pricingType,
+        total_weight: totalWeight ? parseFloat(totalWeight) : null,
+      });
+      
+      toast({
+        title: "Success",
+        description: "Order updated successfully"
+      });
+      onOpenChange(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update order",
+        variant: "destructive"
+      });
+    }
+  };
 
   const handlePaymentStatusChange = async (itemId: string, paymentPending: boolean) => {
     try {
@@ -85,22 +127,6 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
     }
   };
 
-  const handleOrderStatusUpdate = async () => {
-    try {
-      await updateOrderStatus.mutateAsync({ id: order.id, status: orderStatus });
-      toast({
-        title: "Success",
-        description: "Order status updated successfully"
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update order status",
-        variant: "destructive"
-      });
-    }
-  };
-
   const getStatusColor = (status: string) => {
     const colors = {
       'received': 'bg-blue-100 text-blue-800',
@@ -129,105 +155,140 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto bg-white z-50">
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto bg-white z-50">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Edit className="h-5 w-5" />
-            Order Details & Management
+            Edit Order #{order.order_number}
           </DialogTitle>
           <DialogDescription>
-            Order #{order.order_number} - Update order status and manage payment tracking
+            Update order details, status, and manage payment tracking
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Order Status Update */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Order Status</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-4">
-                <Select value={orderStatus} onValueChange={(value: Order['status']) => setOrderStatus(value)}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white z-50">
-                    <SelectItem value="received">Received</SelectItem>
-                    <SelectItem value="processing">Processing</SelectItem>
-                    <SelectItem value="ready">Ready</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="delayed">Delayed</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button 
-                  onClick={handleOrderStatusUpdate} 
-                  disabled={updateOrderStatus.isPending || orderStatus === order.status}
-                  size="sm"
-                >
-                  {updateOrderStatus.isPending ? 'Updating...' : 'Update Status'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Order Summary */}
+          {/* Basic Order Information */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Order Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-gray-500" />
-                  <div>
-                    <p className="font-medium">{order.customer_name}</p>
-                    {order.customer_phone && (
-                      <p className="text-sm text-gray-600 flex items-center gap-1">
-                        <Phone className="h-3 w-3" />
-                        {order.customer_phone}
-                      </p>
-                    )}
-                  </div>
+                <div>
+                  <Label htmlFor="customerName">Customer Name</Label>
+                  <Input
+                    id="customerName"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                  />
                 </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-gray-500" />
-                  <div>
-                    <p className="text-sm text-gray-600">Due Date</p>
-                    <p className="font-medium">{new Date(order.due_date).toLocaleDateString()}</p>
-                  </div>
+                <div>
+                  <Label htmlFor="customerPhone">Customer Phone</Label>
+                  <Input
+                    id="customerPhone"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                  />
                 </div>
-              </div>
-              
-              <div className="flex gap-4">
-                <Badge className={getStatusColor(order.status)}>
-                  {order.status}
-                </Badge>
-                <Badge className={getPriorityColor(order.priority)}>
-                  {order.priority}
-                </Badge>
-                <Badge variant="outline">
-                  {order.pricing_type === 'kg' ? 'By Weight' : 'By Items'}
-                </Badge>
               </div>
 
-              <div className="grid grid-cols-3 gap-4 text-sm">
+              <div>
+                <Label htmlFor="items">Items Description</Label>
+                <Textarea
+                  id="items"
+                  value={items}
+                  onChange={(e) => setItems(e.target.value)}
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <p className="text-gray-600">Total Amount</p>
-                  <p className="font-bold text-lg">₹{order.amount.toFixed(2)}</p>
+                  <Label htmlFor="status">Status</Label>
+                  <Select value={status} onValueChange={(value: Order['status']) => setStatus(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white z-50">
+                      <SelectItem value="received">Received</SelectItem>
+                      <SelectItem value="processing">Processing</SelectItem>
+                      <SelectItem value="ready">Ready</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="delayed">Delayed</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                {order.pricing_type === 'item' && (
-                  <>
-                    <div>
-                      <p className="text-gray-600">Paid Amount</p>
-                      <p className="font-medium text-green-600">₹{totalPaidAmount.toFixed(2)}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Payment Status</p>
-                      <p className="font-medium">{paidItemsCount}/{totalItemsCount} items paid</p>
-                    </div>
-                  </>
+                <div>
+                  <Label htmlFor="priority">Priority</Label>
+                  <Select value={priority} onValueChange={(value: Order['priority']) => setPriority(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white z-50">
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="normal">Normal</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="pricingType">Pricing Type</Label>
+                  <Select value={pricingType} onValueChange={(value: Order['pricing_type']) => setPricingType(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white z-50">
+                      <SelectItem value="item">By Items</SelectItem>
+                      <SelectItem value="kg">By Weight (KG)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="amount">Total Amount (₹)</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                  />
+                </div>
+                {pricingType === 'kg' && (
+                  <div>
+                    <Label htmlFor="totalWeight">Total Weight (KG)</Label>
+                    <Input
+                      id="totalWeight"
+                      type="number"
+                      step="0.01"
+                      value={totalWeight}
+                      onChange={(e) => setTotalWeight(e.target.value)}
+                    />
+                  </div>
                 )}
+                <div>
+                  <Label htmlFor="dueDate">Due Date</Label>
+                  <Input
+                    id="dueDate"
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Badge className={getStatusColor(status)}>
+                  {status}
+                </Badge>
+                <Badge className={getPriorityColor(priority)}>
+                  {priority}
+                </Badge>
+                <Badge variant="outline">
+                  {pricingType === 'kg' ? 'By Weight' : 'By Items'}
+                </Badge>
               </div>
             </CardContent>
           </Card>
@@ -236,7 +297,7 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
-                {order.pricing_type === 'kg' ? <Scale className="h-5 w-5" /> : <Package className="h-5 w-5" />}
+                {pricingType === 'kg' ? <Scale className="h-5 w-5" /> : <Package className="h-5 w-5" />}
                 Payment Management
               </CardTitle>
             </CardHeader>
@@ -245,7 +306,7 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
                 <div className="text-center py-4">
                   <p className="text-gray-600">Loading items...</p>
                 </div>
-              ) : order.pricing_type === 'kg' ? (
+              ) : pricingType === 'kg' ? (
                 <div className="space-y-3">
                   <div className="p-4 border rounded-lg bg-blue-50">
                     <div className="flex items-center justify-between mb-2">
@@ -254,12 +315,12 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
                         Weight-based Service
                       </h4>
                       <Badge variant="outline">
-                        {order.total_weight}kg
+                        {totalWeight}kg
                       </Badge>
                     </div>
                     <div className="text-sm text-gray-600 space-y-1">
-                      <p>Total Weight: {order.total_weight}kg</p>
-                      <p>Total Amount: ₹{order.amount.toFixed(2)}</p>
+                      <p>Total Weight: {totalWeight}kg</p>
+                      <p>Total Amount: ₹{amount}</p>
                     </div>
                     <div className="mt-3 p-3 bg-white rounded border">
                       <p className="text-sm font-medium text-center">
@@ -270,6 +331,22 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
                 </div>
               ) : orderItems.length > 0 ? (
                 <div className="space-y-4">
+                  {/* Payment Summary */}
+                  <div className="grid grid-cols-3 gap-4 text-sm bg-gray-50 p-3 rounded">
+                    <div>
+                      <p className="text-gray-600">Total Amount</p>
+                      <p className="font-bold text-lg">₹{order.amount.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Paid Amount</p>
+                      <p className="font-medium text-green-600">₹{totalPaidAmount.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Payment Status</p>
+                      <p className="font-medium">{paidItemsCount}/{totalItemsCount} items paid</p>
+                    </div>
+                  </div>
+
                   {/* Bulk Actions */}
                   <div className="flex gap-2 pb-3 border-b">
                     <Button
@@ -340,9 +417,15 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
           </Card>
         </div>
 
-        <div className="flex justify-end pt-4">
+        <div className="flex justify-between pt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSave} 
+            disabled={updateOrder.isPending}
+          >
+            {updateOrder.isPending ? 'Saving...' : 'Save Changes'}
           </Button>
         </div>
       </DialogContent>
