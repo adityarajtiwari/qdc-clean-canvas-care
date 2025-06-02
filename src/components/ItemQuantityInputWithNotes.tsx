@@ -5,8 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Minus, X, Tag, FileText } from 'lucide-react';
 import { OrderItem } from '@/hooks/useOrders';
+import { useActiveItemsOnly } from '@/hooks/useLaundryItems';
 
 interface ItemQuantityInputWithNotesProps {
   items: Record<string, OrderItem>;
@@ -16,17 +18,22 @@ interface ItemQuantityInputWithNotesProps {
 const commonTags = ['stained', 'torn', 'delicate', 'new', 'heavily soiled', 'dry clean only'];
 
 const ItemQuantityInputWithNotes = ({ items, onChange }: ItemQuantityInputWithNotesProps) => {
-  const [newItemName, setNewItemName] = useState('');
+  const [selectedItemId, setSelectedItemId] = useState('');
   const [newItemQuantity, setNewItemQuantity] = useState(1);
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
+  
+  const { data: laundryItems, isLoading } = useActiveItemsOnly();
 
   const addItem = () => {
-    if (!newItemName.trim()) return;
+    if (!selectedItemId) return;
+    
+    const selectedItem = laundryItems?.find(item => item.id === selectedItemId);
+    if (!selectedItem) return;
     
     const updatedItems = {
       ...items,
-      [newItemName]: {
-        name: newItemName,
+      [selectedItem.name]: {
+        name: selectedItem.name,
         quantity: newItemQuantity,
         notes: '',
         tags: []
@@ -34,7 +41,7 @@ const ItemQuantityInputWithNotes = ({ items, onChange }: ItemQuantityInputWithNo
     };
     
     onChange(updatedItems);
-    setNewItemName('');
+    setSelectedItemId('');
     setNewItemQuantity(1);
   };
 
@@ -220,12 +227,18 @@ const ItemQuantityInputWithNotes = ({ items, onChange }: ItemQuantityInputWithNo
 
       {/* Add new item */}
       <div className="flex gap-2">
-        <Input
-          placeholder="Item name (e.g., Shirts, Pants)"
-          value={newItemName}
-          onChange={(e) => setNewItemName(e.target.value)}
-          className="flex-1"
-        />
+        <Select value={selectedItemId} onValueChange={setSelectedItemId}>
+          <SelectTrigger className="flex-1">
+            <SelectValue placeholder={isLoading ? "Loading items..." : "Select item"} />
+          </SelectTrigger>
+          <SelectContent>
+            {laundryItems?.map((item) => (
+              <SelectItem key={item.id} value={item.id}>
+                {item.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Input
           type="number"
           min="1"
@@ -233,7 +246,12 @@ const ItemQuantityInputWithNotes = ({ items, onChange }: ItemQuantityInputWithNo
           onChange={(e) => setNewItemQuantity(parseInt(e.target.value) || 1)}
           className="w-20"
         />
-        <Button type="button" onClick={addItem} variant="outline">
+        <Button 
+          type="button" 
+          onClick={addItem} 
+          variant="outline"
+          disabled={!selectedItemId}
+        >
           <Plus className="h-4 w-4" />
         </Button>
       </div>

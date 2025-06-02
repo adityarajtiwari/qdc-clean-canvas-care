@@ -1,11 +1,11 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface OrderItem {
   name: string;
   quantity: number;
-  price?: number;
+  notes?: string;
+  tags?: string[];
 }
 
 export interface Order {
