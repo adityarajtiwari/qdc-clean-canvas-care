@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useOrders } from '@/hooks/useOrders';
 import { Button } from '@/components/ui/button';
@@ -5,9 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Filter, Package, CreditCard, Download } from 'lucide-react';
+import { Plus, Search, Filter, Package, Download } from 'lucide-react';
 import OrderActions from './OrderActions';
-import CreateOrderDialog from './CreateOrderDialog';
 import Pagination from './Pagination';
 import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
@@ -17,7 +17,6 @@ const OrderManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
   
   const { data, isLoading, error } = useOrders(currentPage, 10, searchTerm, statusFilter, paymentFilter);
   const { toast } = useToast();
@@ -125,7 +124,7 @@ const OrderManagement = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Order Management</h1>
-        <Button onClick={() => setShowCreateDialog(true)} className="flex items-center gap-2">
+        <Button className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
           New Order
         </Button>
@@ -276,7 +275,7 @@ const OrderManagement = () => {
                   ? "Try adjusting your filters to see more results."
                   : "Get started by creating your first order."}
               </p>
-              <Button onClick={() => setShowCreateDialog(true)}>
+              <Button>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Order
               </Button>
@@ -284,13 +283,6 @@ const OrderManagement = () => {
           )}
         </CardContent>
       </Card>
-
-      {showCreateDialog && (
-        <CreateOrderDialog 
-          open={showCreateDialog}
-          onOpenChange={setShowCreateDialog}
-        />
-      )}
     </div>
   );
 };
