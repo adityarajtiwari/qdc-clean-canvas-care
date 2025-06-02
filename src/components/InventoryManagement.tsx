@@ -7,10 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Search, Package, Weight, Clock, Calendar, User } from 'lucide-react';
 import { useOrders } from '@/hooks/useOrders';
 import { useLaundryItems, useServiceTypes } from '@/hooks/useLaundryItems';
+import OrderDetailsDialog from './OrderDetailsDialog';
 
 const InventoryManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [pricingFilter, setPricingFilter] = useState('all');
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   
   // Get all orders without status filter to handle filtering manually
   const { data: ordersData, isLoading } = useOrders(1, 1000, searchTerm, 'all');
@@ -30,6 +33,14 @@ const InventoryManagement = () => {
     pricingType: o.pricing_type,
     hasItems: !!o.items_detail && Object.keys(o.items_detail).length > 0
   })));
+
+  const handleOrderClick = (orderNumber) => {
+    const order = orders.find(o => o.order_number === orderNumber);
+    if (order) {
+      setSelectedOrder(order);
+      setShowEditDialog(true);
+    }
+  };
 
   // Group by item types for item-based orders
   const itemInventory = pendingOrders
@@ -218,7 +229,12 @@ const InventoryManagement = () => {
                             <div className="flex justify-between items-start mb-2">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-medium text-blue-600">{order.orderNumber}</span>
+                                  <button
+                                    onClick={() => handleOrderClick(order.orderNumber)}
+                                    className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                                  >
+                                    {order.orderNumber}
+                                  </button>
                                   <Badge className={getPriorityColor(order.priority)}>
                                     {order.priority}
                                   </Badge>
@@ -294,7 +310,12 @@ const InventoryManagement = () => {
                             <div className="flex justify-between items-start mb-2">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-medium text-purple-600">{order.orderNumber}</span>
+                                  <button
+                                    onClick={() => handleOrderClick(order.orderNumber)}
+                                    className="font-medium text-purple-600 hover:text-purple-800 hover:underline cursor-pointer"
+                                  >
+                                    {order.orderNumber}
+                                  </button>
                                   <Badge className={getPriorityColor(order.priority)}>
                                     {order.priority}
                                   </Badge>
@@ -386,6 +407,15 @@ const InventoryManagement = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Order Details Dialog */}
+      {selectedOrder && (
+        <OrderDetailsDialog
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          order={selectedOrder}
+        />
+      )}
     </div>
   );
 };
