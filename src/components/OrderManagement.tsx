@@ -16,6 +16,7 @@ const OrderManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
+  const [showNewOrderDialog, setShowNewOrderDialog] = useState(false);
   
   const { data, isLoading, error } = useOrders(currentPage, 10, searchTerm, statusFilter, paymentFilter);
   const { toast } = useToast();
@@ -181,7 +182,10 @@ const OrderManagement = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Order Management</h1>
-        <Button className="flex items-center gap-2">
+        <Button 
+          className="flex items-center gap-2"
+          onClick={() => setShowNewOrderDialog(true)}
+        >
           <Plus className="h-4 w-4" />
           New Order
         </Button>
@@ -332,7 +336,7 @@ const OrderManagement = () => {
                   ? "Try adjusting your filters to see more results."
                   : "Get started by creating your first order."}
               </p>
-              <Button>
+              <Button onClick={() => setShowNewOrderDialog(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Order
               </Button>
@@ -340,6 +344,23 @@ const OrderManagement = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Temporary simple new order dialog */}
+      {showNewOrderDialog && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h2 className="text-xl font-bold mb-4">New Order</h2>
+            <p className="text-gray-600 mb-4">
+              New order creation functionality is coming soon. For now, you can create orders through the existing interface.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowNewOrderDialog(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
