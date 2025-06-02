@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -63,7 +64,8 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
   });
 
   console.log('OrderDetailsDialog rendered for order:', order.id);
-  console.log('Order items:', orderItems);
+  console.log('Order items from DB:', orderItems);
+  console.log('Form items_detail:', formData.items_detail);
 
   const handleCustomerSelect = (customerId: string, customerName: string, customerPhone?: string) => {
     setFormData(prev => ({
@@ -251,9 +253,63 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
     }
   };
 
-  const paidItemsCount = orderItems.filter(item => !item.payment_pending).length;
-  const totalItemsCount = orderItems.length;
-  const totalPaidAmount = orderItems
+  // Create a combined view of existing order items and form items
+  const getCombinedItems = () => {
+    const existingItems = orderItems.map(item => ({
+      id: item.id,
+      item_name: item.item_name,
+      quantity: item.quantity,
+      price_per_item: item.price_per_item,
+      total_price: item.total_price,
+      payment_pending: item.payment_pending,
+      isFromDB: true
+    }));
+
+    const formItems = Object.entries(formData.items_detail).map(([itemId, item]) => {
+      // Check if this item already exists in DB items
+      const existingItem = existingItems.find(dbItem => dbItem.item_name === item.name);
+      if (existingItem) {
+        // Update the existing item with new quantity and price
+        return {
+          ...existingItem,
+          quantity: item.quantity,
+          price_per_item: item.price || 0,
+          total_price: item.quantity * (item.price || 0),
+          isUpdated: true
+        };
+      } else {
+        // This is a new item
+        return {
+          id: itemId,
+          item_name: item.name,
+          quantity: item.quantity,
+          price_per_item: item.price || 0,
+          total_price: item.quantity * (item.price || 0),
+          payment_pending: true, // New items default to payment pending
+          isFromDB: false,
+          isNew: true
+        };
+      }
+    });
+
+    // Remove duplicates and combine
+    const combinedItems = [...formItems];
+    
+    // Add existing items that are not in form items
+    existingItems.forEach(existingItem => {
+      const isInFormItems = formItems.some(formItem => formItem.item_name === existingItem.item_name);
+      if (!isInFormItems) {
+        combinedItems.push(existingItem);
+      }
+    });
+
+    return combinedItems;
+  };
+
+  const combinedItems = getCombinedItems();
+  const paidItemsCount = combinedItems.filter(item => !item.payment_pending).length;
+  const totalItemsCount = combinedItems.length;
+  const totalPaidAmount = combinedItems
     .filter(item => !item.payment_pending)
     .reduce((sum, item) => sum + item.total_price, 0);
 
@@ -406,8 +462,8 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
             />
           </div>
 
-          {/* Payment Management Section - KEEP UNCHANGED for item-based orders */}
-          {formData.pricing_type === 'item' && orderItems.length > 0 && (
+          {/* Payment Management Section - UPDATED to show combined items */}
+          {formData.pricing_type === 'item' && combinedItems.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -416,29 +472,25 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {isLoading ? (
-                  <div className="text-center py-4">
-                    <p className="text-gray-600">Loading items...</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {/* Payment Summary */}
-                    <div className="grid grid-cols-3 gap-4 text-sm bg-gray-50 p-3 rounded">
-                      <div>
-                        <p className="text-gray-600">Total Amount</p>
-                        <p className="font-bold text-lg">₹{order.amount.toFixed(2)}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Paid Amount</p>
-                        <p className="font-medium text-green-600">₹{totalPaidAmount.toFixed(2)}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Payment Status</p>
-                        <p className="font-medium">{paidItemsCount}/{totalItemsCount} items paid</p>
-                      </div>
+                <div className="space-y-4">
+                  {/* Payment Summary */}
+                  <div className="grid grid-cols-3 gap-4 text-sm bg-gray-50 p-3 rounded">
+                    <div>
+                      <p className="text-gray-600">Total Amount</p>
+                      <p className="font-bold text-lg">₹{formData.amount.toFixed(2)}</p>
                     </div>
+                    <div>
+                      <p className="text-gray-600">Paid Amount</p>
+                      <p className="font-medium text-green-600">₹{totalPaidAmount.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Payment Status</p>
+                      <p className="font-medium">{paidItemsCount}/{totalItemsCount} items paid</p>
+                    </div>
+                  </div>
 
-                    {/* Bulk Actions */}
+                  {/* Bulk Actions - only for existing DB items */}
+                  {orderItems.length > 0 && (
                     <div className="flex gap-2 pb-3 border-b">
                       <Button
                         onClick={handleMarkAllAsPaid}
@@ -457,27 +509,37 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
                         Mark All as Pending
                       </Button>
                     </div>
+                  )}
 
-                    {/* Individual Items */}
-                    <div className="space-y-3">
-                      {orderItems.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
+                  {/* Individual Items - Combined view */}
+                  <div className="space-y-3">
+                    {combinedItems.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
                               <h4 className="font-medium">{item.item_name}</h4>
-                              <Badge variant={item.payment_pending ? "destructive" : "default"}>
-                                {item.payment_pending ? "Payment Pending" : "Paid"}
-                              </Badge>
+                              {item.isNew && (
+                                <Badge variant="secondary" className="bg-blue-100 text-blue-800">New</Badge>
+                              )}
+                              {item.isUpdated && (
+                                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Updated</Badge>
+                              )}
                             </div>
-                            <div className="text-sm text-gray-600 mt-1">
-                              <span>Qty: {item.quantity}</span>
-                              <span className="mx-2">•</span>
-                              <span>Price: ₹{item.price_per_item.toFixed(2)}</span>
-                              <span className="mx-2">•</span>
-                              <span>Total: ₹{item.total_price.toFixed(2)}</span>
-                            </div>
+                            <Badge variant={item.payment_pending ? "destructive" : "default"}>
+                              {item.payment_pending ? "Payment Pending" : "Paid"}
+                            </Badge>
                           </div>
-                          <div className="ml-4">
+                          <div className="text-sm text-gray-600 mt-1">
+                            <span>Qty: {item.quantity}</span>
+                            <span className="mx-2">•</span>
+                            <span>Price: ₹{item.price_per_item.toFixed(2)}</span>
+                            <span className="mx-2">•</span>
+                            <span>Total: ₹{item.total_price.toFixed(2)}</span>
+                          </div>
+                        </div>
+                        <div className="ml-4">
+                          {item.isFromDB ? (
                             <Button
                               size="sm"
                               variant={item.payment_pending ? "default" : "outline"}
@@ -486,12 +548,16 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
                             >
                               {item.payment_pending ? "Mark Paid" : "Mark Pending"}
                             </Button>
-                          </div>
+                          ) : (
+                            <Badge variant="outline" className="bg-gray-100 text-gray-600">
+                              New Item - Save to manage payment
+                            </Badge>
+                          )}
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
           )}
