@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useUpdateOrder, useUpdateOrderStatus, Order } from '@/hooks/useOrders';
-import { useOrderItems, useUpdateOrderItemPayment } from '@/hooks/useOrderItems';
+import { useOrderItems, useUpdateOrderItemPayment, useCreateOrderItems } from '@/hooks/useOrderItems';
 import { useLaundryItems, useServiceTypes } from '@/hooks/useLaundryItems';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Trash2, Save, Package, CreditCard, CheckCircle, XCircle } from 'lucide-react';
@@ -53,6 +52,7 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
   const updateOrderMutation = useUpdateOrder();
   const updateStatusMutation = useUpdateOrderStatus();
   const updatePaymentMutation = useUpdateOrderItemPayment();
+  const createOrderItemsMutation = useCreateOrderItems();
   
   const { data: orderItems = [] } = useOrderItems(order.id);
   const { data: laundryItems = [] } = useLaundryItems();
@@ -65,7 +65,7 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
 
   const handleSave = async () => {
     try {
-      // Update basic order details
+      // Update basic order details first
       await updateOrderMutation.mutateAsync({
         id: editedOrder.id,
         customer_name: editedOrder.customer_name,
@@ -84,6 +84,24 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
         discount_type: editedOrder.discount_type,
       });
 
+      // Create new items in the order_items table if any
+      if (newItems.length > 0) {
+        const itemsToCreate = newItems
+          .filter(item => item.item_name && item.quantity > 0) // Only create valid items
+          .map(item => ({
+            order_id: editedOrder.id,
+            item_name: item.item_name,
+            quantity: item.quantity,
+            price_per_item: item.price_per_item,
+            total_price: item.total_price,
+            payment_pending: item.payment_pending,
+          }));
+
+        if (itemsToCreate.length > 0) {
+          await createOrderItemsMutation.mutateAsync(itemsToCreate);
+        }
+      }
+
       toast({
         title: "Success",
         description: "Order updated successfully"
@@ -91,6 +109,7 @@ const OrderDetailsDialog = ({ open, onOpenChange, order }: OrderDetailsDialogPro
       
       onOpenChange(false);
     } catch (error) {
+      console.error('Error updating order:', error);
       toast({
         title: "Error",
         description: "Failed to update order",
